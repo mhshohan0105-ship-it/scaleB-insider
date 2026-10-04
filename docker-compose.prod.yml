@@ -1,0 +1,62 @@
+# Production stack: app + PostgreSQL + nightly database dump (DEPLOYMENT.md).
+# Put secrets in a .env file next to this file; never commit it.
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: scaleb
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: scaleb_insider
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scaleb -d scaleb_insider"]
+      interval: 10s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://scaleb:${POSTGRES_PASSWORD}@db:5432/scaleb_insider?schema=public
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET}
+      AUTH_TRUST_HOST: "true"
+      APP_URL: ${APP_URL:?set APP_URL}
+      CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET}
+      SMS_URL_TEMPLATE: ${SMS_URL_TEMPLATE:-}
+      SMS_METHOD: ${SMS_METHOD:-GET}
+      SMS_API_KEY: ${SMS_API_KEY:-}
+      SMS_SENDER_ID: ${SMS_SENDER_ID:-}
+      SMS_SUCCESS_REGEX: ${SMS_SUCCESS_REGEX:-}
+    ports:
+      - "127.0.0.1:3000:3000" # behind a TLS reverse proxy (Caddy / nginx)
+
+  # Daily pg_dump at 02:00 Dhaka, 14 days kept, in ./backups.
+  backup:
+    image: postgres:16
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      TZ: Asia/Dhaka
+    volumes:
+      - ./backups:/backups
+    entrypoint: >
+      sh -c 'while true; do
+        now=$$(date +%H%M);
+        if [ "$$now" = "0200" ]; then
+          pg_dump -h db -U scaleb -Fc scaleb_insider > /backups/scaleb-$$(date +%Y%m%d).dump &&
+          find /backups -name "scaleb-*.dump" -mtime +14 -delete;
+          sleep 60;
+        fi;
+        sleep 30;
+      done'
+
+volumes:
+  pgdata:

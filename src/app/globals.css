@@ -1,0 +1,138 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #f3f6f6;
+}
+
+/* Login */
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 4fr);
+}
+
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 64px;
+  color: #e6f4f1;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.08), transparent 40%),
+    linear-gradient(150deg, #0f2a2e 0%, #0e7c6b 100%);
+}
+
+.login-brand h1 {
+  margin: 24px 0 12px;
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+.login-brand p {
+  max-width: 420px;
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.6;
+  opacity: 0.85;
+}
+
+.login-brand-mark {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #e6f4f1;
+  color: #0f2a2e;
+  font-weight: 700;
+  font-size: 22px;
+}
+
+.login-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  background: #ffffff;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 380px;
+}
+
+@media (max-width: 860px) {
+  .login-page {
+    grid-template-columns: 1fr;
+  }
+  .login-brand {
+    padding: 32px 24px;
+  }
+  .login-brand h1 {
+    font-size: 28px;
+  }
+}
+
+/* App shell */
+.shell-logo {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+  color: #e6f4f1;
+  font-weight: 600;
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.shell-logo-mark {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #e6f4f1;
+  color: #0f2a2e;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.shell-sider-scroll {
+  height: calc(100vh - 56px);
+  overflow-y: auto;
+}
+
+.shell-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid #e5eaea;
+}
+
+.shell-header-spacer {
+  flex: 1;
+}
+
+.shell-content {
+  padding: 20px;
+  min-height: calc(100vh - 64px);
+}
+
+/* Invoice line rows are dense; the "(optional)" hint would wrap the labels. */
+.line-row .ant-form-item .ant-form-item-label > label .ant-form-item-optional {
+  display: none;
+}

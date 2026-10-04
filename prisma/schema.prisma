@@ -1,0 +1,2226 @@
+// scaleB Insider data model. See PLAN.md section 5.
+// Money columns are always Decimal(14,2); rates/percentages are Decimal(7,4).
+// Every tenant table has `agencyId` and is scoped by src/server/db/tenant.ts.
+// Services write foreign keys as scalar ids (e.g. roleId), never `connect`.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Tenancy and users ──────────────────────────────────────────────────────
+
+enum AgencyStatus {
+  ACTIVE
+  SUSPENDED
+  TRIAL
+}
+
+model Agency {
+  id              String       @id @default(cuid())
+  code            String       @unique // short login code, e.g. "demo"
+  name            String
+  logoUrl         String?
+  address         String?
+  phone           String?
+  email           String?
+  website         String?
+  tradeLicense    String?
+  iataNo          String?
+  currency        String       @default("BDT")
+  fiscalYearStart Int          @default(7) // month number, BD fiscal year starts July
+  invoiceFooter   String?
+  status          AgencyStatus @default(ACTIVE)
+  plan            String       @default("standard")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  setting            AgencySetting?
+  users              User[]
+  roles              Role[]
+  loginHistory       LoginHistory[]
+  notifications      Notification[]
+  feedback           Feedback[]
+  auditLogs          AuditLog[]
+  clientCategories   ClientCategory[]
+  countries          Country[]
+  airports           Airport[]
+  airlines           Airline[]
+  products           Product[]
+  visaTypes          VisaType[]
+  departments        Department[]
+  designations       Designation[]
+  employees          Employee[]
+  roomTypes          RoomType[]
+  transportTypes     TransportType[]
+  passportStatuses   PassportStatus[]
+  groups             Group[]
+  maharams           Maharam[]
+  companies          Company[]
+  cities             City[]
+  places             Place[]
+  tourGroups         TourGroup[]
+  tourTickets        TourTicket[]
+  guides             Guide[]
+  transports         Transport[]
+  foods              Food[]
+  accommodations     Accommodation[]
+  otherTransports    OtherTransport[]
+  clients            Client[]
+  combinedClients    CombinedClient[]
+  vendors            Vendor[]
+  agents             Agent[]
+  documentSequences  DocumentSequence[]
+  ledgerAccounts     LedgerAccount[]
+  moneyAccounts      MoneyAccount[]
+  journalEntries     JournalEntry[]
+  journalLines       JournalLine[]
+  accountingPeriods  AccountingPeriod[]
+  balanceTransfers   BalanceTransfer[]
+  invoices           Invoice[]
+  airTickets         InvoiceAirTicket[]
+  moneyReceipts      MoneyReceipt[]
+  receiptAllocations MoneyReceiptAllocation[]
+  vendorPayments     VendorPayment[]
+  advanceReturns     AdvanceReturn[]
+  invoiceItems       InvoiceItem[]
+  visaLines          InvoiceVisaLine[]
+  reissueLines       InvoiceReissueLine[]
+  pilgrims           Pilgrim[]
+  pilgrimEvents      PilgrimEvent[]
+  hajjTransfers      HajjTransfer[]
+  hajjTransferLines  HajjTransferLine[]
+  expenseHeads       ExpenseHead[]
+  vouchers           Voucher[]
+  attachments        Attachment[]
+  loanAuthorities    LoanAuthority[]
+  loans              Loan[]
+  loanPayments       LoanPayment[]
+  payrolls           Payroll[]
+  cheques            Cheque[]
+  passports          Passport[]
+  quotations         Quotation[]
+  quotationLines     QuotationLine[]
+  smsLogs            SmsLog[]
+  refunds            Refund[]
+  refundLines        RefundLine[]
+  voucherAllocations VoucherAllocation[]
+}
+
+enum AitBase {
+  BASE_FARE
+  TOTAL_FARE
+}
+
+enum CommissionBase {
+  BASE_FARE
+  TOTAL_FARE
+}
+
+/// App Config (PLAN.md section 8). One row per agency.
+model AgencySetting {
+  id                    String         @id @default(cuid())
+  agencyId              String         @unique
+  aitRatePercent        Decimal        @default(0.3) @db.Decimal(7, 4)
+  aitBase               AitBase        @default(TOTAL_FARE)
+  commissionBase        CommissionBase @default(BASE_FARE)
+  invoicePrefixes       Json           @default("{}")
+  invoiceTerms          String?
+  smsEnabled            Boolean        @default(false)
+  defaultMoneyAccountId String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  updatedById           String?
+
+  agency Agency @relation(fields: [agencyId], references: [id])
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  permissions Json     @default("{}")
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency Agency @relation(fields: [agencyId], references: [id])
+  users  User[]
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+model User {
+  id           String    @id @default(cuid())
+  agencyId     String
+  name         String
+  username     String
+  email        String?
+  phone        String?
+  passwordHash String
+  roleId       String
+  employeeId   String?
+  isActive     Boolean   @default(true)
+  /// Platform operator: may use /admin (agencies, plans, impersonation).
+  isSuperAdmin Boolean   @default(false)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdById  String?
+
+  agency        Agency         @relation(fields: [agencyId], references: [id])
+  role          Role           @relation(fields: [roleId], references: [id])
+  employee      Employee?      @relation(fields: [employeeId], references: [id])
+  loginHistory  LoginHistory[]
+  notifications Notification[]
+  feedback      Feedback[]
+
+  @@unique([agencyId, username])
+  @@index([agencyId, createdAt])
+}
+
+model LoginHistory {
+  id        String   @id @default(cuid())
+  agencyId  String?
+  userId    String?
+  username  String
+  ip        String?
+  userAgent String?
+  success   Boolean
+  at        DateTime @default(now())
+
+  agency Agency? @relation(fields: [agencyId], references: [id])
+  user   User?   @relation(fields: [userId], references: [id])
+
+  @@index([agencyId, at])
+  @@index([username, at])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  agencyId  String
+  userId    String?
+  action    String // CREATE, UPDATE, ACTIVATE, DEACTIVATE, VOID, LOGIN, ...
+  entity    String
+  entityId  String?
+  before    Json?
+  after     Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  agency Agency @relation(fields: [agencyId], references: [id])
+
+  @@index([agencyId, createdAt])
+  @@index([agencyId, entity, entityId])
+}
+
+// ─── Configuration masters ─────────────────────────────────────────────────
+// Masters are deactivated (isActive = false), never deleted.
+
+model ClientCategory {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  prefix      String?
+  note        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency  Agency   @relation(fields: [agencyId], references: [id])
+  clients Client[]
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+model Country {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  iso2        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency Agency @relation(fields: [agencyId], references: [id])
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+model Airport {
+  id          String   @id @default(cuid())
+  agencyId    String
+  iata        String
+  name        String
+  city        String?
+  country     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency Agency @relation(fields: [agencyId], references: [id])
+
+  @@unique([agencyId, iata])
+  @@index([agencyId, createdAt])
+}
+
+model Airline {
+  id                String          @id @default(cuid())
+  agencyId          String
+  iata              String
+  name              String
+  /// Overrides App Config commission base for this airline when set.
+  commissionBase    CommissionBase?
+  commissionPercent Decimal?        @db.Decimal(7, 4)
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  createdById       String?
+
+  agency       Agency               @relation(fields: [agencyId], references: [id])
+  reissueLines InvoiceReissueLine[]
+  tickets      InvoiceAirTicket[]
+
+  @@unique([agencyId, iata])
+  @@index([agencyId, createdAt])
+}
+
+enum ProductType {
+  AIR
+  VISA
+  TOUR
+  HAJJ
+  UMRAH
+  HOTEL
+  INSURANCE
+  OTHER
+}
+
+model Product {
+  id          String      @id @default(cuid())
+  agencyId    String
+  name        String
+  type        ProductType @default(OTHER)
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  createdById String?
+
+  agency         Agency          @relation(fields: [agencyId], references: [id])
+  quotationLines QuotationLine[]
+  invoiceItems   InvoiceItem[]
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+model VisaType {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency    Agency            @relation(fields: [agencyId], references: [id])
+  visaLines InvoiceVisaLine[]
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency    Agency     @relation(fields: [agencyId], references: [id])
+  employees Employee[]
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+model Designation {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency    Agency     @relation(fields: [agencyId], references: [id])
+  employees Employee[]
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+model Employee {
+  id                String    @id @default(cuid())
+  agencyId          String
+  name              String
+  designationId     String?
+  departmentId      String?
+  phone             String?
+  email             String?
+  address           String?
+  nid               String?
+  salary            Decimal   @default(0) @db.Decimal(14, 2)
+  commissionPercent Decimal   @default(0) @db.Decimal(7, 4)
+  joinDate          DateTime?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdById       String?
+
+  agency        Agency       @relation(fields: [agencyId], references: [id])
+  payrolls      Payroll[]
+  salesInvoices Invoice[]
+  designation   Designation? @relation(fields: [designationId], references: [id])
+  department    Department?  @relation(fields: [departmentId], references: [id])
+  users         User[]
+
+  @@index([agencyId, createdAt])
+  @@index([agencyId, name])
+}
+
+model RoomType {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency       Agency        @relation(fields: [agencyId], references: [id])
+  invoiceItems InvoiceItem[]
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+model TransportType {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency Agency @relation(fields: [agencyId], references: [id])
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+model PassportStatus {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency    Agency     @relation(fields: [agencyId], references: [id])
+  passports Passport[]
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+enum GroupType {
+  HAJJ
+  UMRAH
+  TOUR
+}
+
+/// Hajj / Umrah / tour pilgrim groups.
+model Group {
+  id          String    @id @default(cuid())
+  agencyId    String
+  name        String
+  type        GroupType @default(HAJJ)
+  year        Int?
+  leaderName  String?
+  note        String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+
+  agency        Agency         @relation(fields: [agencyId], references: [id])
+  pilgrims      Pilgrim[]
+  hajjTransfers HajjTransfer[]
+  invoices      Invoice[]
+  items         InvoiceItem[]
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+/// Maharam relation names (e.g. Husband, Father) used for Hajj pilgrims.
+model Maharam {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency   Agency    @relation(fields: [agencyId], references: [id])
+  pilgrims Pilgrim[]
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+/// Corporate client companies.
+model Company {
+  id            String   @id @default(cuid())
+  agencyId      String
+  name          String
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdById   String?
+
+  agency  Agency   @relation(fields: [agencyId], references: [id])
+  clients Client[]
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+// ─── Tour itinerary masters ────────────────────────────────────────────────
+// Cost items carry a default cost and an optional default vendor
+// (vendorId becomes a Vendor relation in Phase 2).
+
+model City {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  country     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency         Agency          @relation(fields: [agencyId], references: [id])
+  places         Place[]
+  accommodations Accommodation[]
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+model Place {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  cityId      String?
+  cost        Decimal  @default(0) @db.Decimal(14, 2)
+  vendorId    String?
+  note        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency Agency  @relation(fields: [agencyId], references: [id])
+  vendor Vendor? @relation(fields: [vendorId], references: [id])
+  city   City?   @relation(fields: [cityId], references: [id])
+
+  @@index([agencyId, createdAt])
+}
+
+model TourGroup {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  note        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency   Agency    @relation(fields: [agencyId], references: [id])
+  invoices Invoice[]
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+model TourTicket {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  cost        Decimal  @default(0) @db.Decimal(14, 2)
+  vendorId    String?
+  note        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency Agency  @relation(fields: [agencyId], references: [id])
+  vendor Vendor? @relation(fields: [vendorId], references: [id])
+
+  @@index([agencyId, createdAt])
+}
+
+model Guide {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  phone       String?
+  cost        Decimal  @default(0) @db.Decimal(14, 2)
+  vendorId    String?
+  note        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency Agency  @relation(fields: [agencyId], references: [id])
+  vendor Vendor? @relation(fields: [vendorId], references: [id])
+
+  @@index([agencyId, createdAt])
+}
+
+model Transport {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  cost        Decimal  @default(0) @db.Decimal(14, 2)
+  vendorId    String?
+  note        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency Agency  @relation(fields: [agencyId], references: [id])
+  vendor Vendor? @relation(fields: [vendorId], references: [id])
+
+  @@index([agencyId, createdAt])
+}
+
+model Food {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  cost        Decimal  @default(0) @db.Decimal(14, 2)
+  vendorId    String?
+  note        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency Agency  @relation(fields: [agencyId], references: [id])
+  vendor Vendor? @relation(fields: [vendorId], references: [id])
+
+  @@index([agencyId, createdAt])
+}
+
+model Accommodation {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  cityId      String?
+  cost        Decimal  @default(0) @db.Decimal(14, 2)
+  vendorId    String?
+  note        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency Agency  @relation(fields: [agencyId], references: [id])
+  vendor Vendor? @relation(fields: [vendorId], references: [id])
+  city   City?   @relation(fields: [cityId], references: [id])
+
+  @@index([agencyId, createdAt])
+}
+
+model OtherTransport {
+  id          String   @id @default(cuid())
+  agencyId    String
+  name        String
+  cost        Decimal  @default(0) @db.Decimal(14, 2)
+  vendorId    String?
+  note        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  agency Agency  @relation(fields: [agencyId], references: [id])
+  vendor Vendor? @relation(fields: [vendorId], references: [id])
+
+  @@index([agencyId, createdAt])
+}
+
+// ─── Parties ────────────────────────────────────────────────────────────────
+// Balance convention for every party: positive = the party owes the agency
+// (receivable), negative = the agency owes the party (payable / advance).
+// `balance` is a cache of the party's ledger (PLAN.md 2.2); from Phase 3 the
+// posting engine maintains it and a nightly job checks for drift.
+
+enum OpeningBalanceType {
+  RECEIVABLE // the party owes the agency
+  PAYABLE // the agency owes the party
+}
+
+enum ClientType {
+  INDIVIDUAL
+  CORPORATE
+}
+
+model Client {
+  id                 String             @id @default(cuid())
+  agencyId           String
+  code               String
+  name               String
+  type               ClientType         @default(INDIVIDUAL)
+  categoryId         String?
+  companyId          String?
+  phone              String?
+  email              String?
+  address            String?
+  walkingCustomer    Boolean            @default(false)
+  creditLimit        Decimal            @default(0) @db.Decimal(14, 2)
+  openingBalance     Decimal            @default(0) @db.Decimal(14, 2)
+  openingBalanceType OpeningBalanceType @default(RECEIVABLE)
+  balance            Decimal            @default(0) @db.Decimal(14, 2)
+  note               String?
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  createdById        String?
+
+  agency     Agency           @relation(fields: [agencyId], references: [id])
+  combined   CombinedClient[]
+  passports  Passport[]
+  quotations Quotation[]
+  pilgrims   Pilgrim[]
+  refunds    Refund[]
+  invoices   Invoice[]
+  receipts   MoneyReceipt[]
+  category   ClientCategory?  @relation(fields: [categoryId], references: [id])
+  company    Company?         @relation(fields: [companyId], references: [id])
+
+  @@unique([agencyId, code])
+  @@index([agencyId, createdAt])
+  @@index([agencyId, name])
+  @@index([agencyId, phone])
+}
+
+/// A party that is both a client and a vendor, kept on one ledger.
+model CombinedClient {
+  id                 String             @id @default(cuid())
+  agencyId           String
+  code               String
+  name               String
+  contactPerson      String?
+  phone              String?
+  email              String?
+  address            String?
+  openingBalance     Decimal            @default(0) @db.Decimal(14, 2)
+  openingBalanceType OpeningBalanceType @default(RECEIVABLE)
+  balance            Decimal            @default(0) @db.Decimal(14, 2)
+  note               String?
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  createdById        String?
+  /// Sales to this party are invoiced to this client (receivable stays in AR).
+  clientId           String?
+  /// Purchases from this party are made from this vendor (payable stays in AP).
+  vendorId           String?
+
+  agency Agency  @relation(fields: [agencyId], references: [id])
+  client Client? @relation(fields: [clientId], references: [id])
+  vendor Vendor? @relation(fields: [vendorId], references: [id])
+
+  @@unique([agencyId, code])
+  @@unique([agencyId, clientId])
+  @@unique([agencyId, vendorId])
+  @@index([agencyId, createdAt])
+  @@index([agencyId, name])
+}
+
+enum VendorType {
+  AIRLINE
+  AIRLINE_CONSOLIDATOR
+  GDS
+  VISA
+  HOTEL
+  TRANSPORT
+  OTHER
+}
+
+model Vendor {
+  id                 String             @id @default(cuid())
+  agencyId           String
+  code               String
+  name               String
+  type               VendorType         @default(OTHER)
+  contactPerson      String?
+  phone              String?
+  email              String?
+  address            String?
+  bankInfo           String?
+  commissionPercent  Decimal            @default(0) @db.Decimal(7, 4)
+  openingBalance     Decimal            @default(0) @db.Decimal(14, 2)
+  openingBalanceType OpeningBalanceType @default(PAYABLE)
+  balance            Decimal            @default(0) @db.Decimal(14, 2)
+  note               String?
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  createdById        String?
+
+  agency          Agency               @relation(fields: [agencyId], references: [id])
+  combined        CombinedClient[]
+  quotationLines  QuotationLine[]
+  reissueLines    InvoiceReissueLine[]
+  refundLines     RefundLine[]
+  invoiceItems    InvoiceItem[]
+  visaLines       InvoiceVisaLine[]
+  airTickets      InvoiceAirTicket[]
+  payments        VendorPayment[]
+  places          Place[]
+  tourTickets     TourTicket[]
+  guides          Guide[]
+  transports      Transport[]
+  foods           Food[]
+  accommodations  Accommodation[]
+  otherTransports OtherTransport[]
+
+  @@unique([agencyId, code])
+  @@index([agencyId, createdAt])
+  @@index([agencyId, name])
+}
+
+model Agent {
+  id                 String             @id @default(cuid())
+  agencyId           String
+  code               String
+  name               String
+  phone              String?
+  email              String?
+  address            String?
+  commissionPercent  Decimal            @default(0) @db.Decimal(7, 4)
+  openingBalance     Decimal            @default(0) @db.Decimal(14, 2)
+  openingBalanceType OpeningBalanceType @default(PAYABLE)
+  balance            Decimal            @default(0) @db.Decimal(14, 2)
+  note               String?
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  createdById        String?
+
+  agency   Agency    @relation(fields: [agencyId], references: [id])
+  invoices Invoice[]
+
+  @@unique([agencyId, code])
+  @@index([agencyId, createdAt])
+  @@index([agencyId, name])
+}
+
+// ─── Numbering ──────────────────────────────────────────────────────────────
+
+/// Per agency counters for document and party numbers (PLAN.md 2.3).
+/// year = 0 for counters that never reset (party codes).
+model DocumentSequence {
+  id         String   @id @default(cuid())
+  agencyId   String
+  docType    String
+  year       Int
+  lastNumber Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  agency Agency @relation(fields: [agencyId], references: [id])
+
+  @@unique([agencyId, docType, year])
+}
+
+// ─── Accounting core (PLAN.md 2.2) ──────────────────────────────────────────
+// Only src/server/accounting/post.ts writes JournalEntry / JournalLine.
+// Posted lines are never updated or deleted: corrections are reversals.
+
+enum LedgerType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+model LedgerAccount {
+  id          String     @id @default(cuid())
+  agencyId    String
+  code        String
+  name        String
+  type        LedgerType
+  /// Stable key for system accounts (e.g. "AR", "SALES_AIR"); null for user accounts.
+  systemKey   String?
+  isSystem    Boolean    @default(false)
+  parentId    String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  createdById String?
+
+  agency       Agency          @relation(fields: [agencyId], references: [id])
+  expenseHead  ExpenseHead?
+  parent       LedgerAccount?  @relation("LedgerTree", fields: [parentId], references: [id])
+  children     LedgerAccount[] @relation("LedgerTree")
+  moneyAccount MoneyAccount?
+  lines        JournalLine[]
+
+  @@unique([agencyId, code])
+  @@unique([agencyId, systemKey])
+  @@index([agencyId, createdAt])
+}
+
+enum MoneyAccountKind {
+  CASH
+  BANK
+  MOBILE_BANKING
+  CREDIT_CARD
+}
+
+/// Cash, bank, mobile wallet or card account. Each maps to one asset ledger.
+model MoneyAccount {
+  id              String           @id @default(cuid())
+  agencyId        String
+  name            String
+  kind            MoneyAccountKind @default(CASH)
+  bankName        String?
+  /// Stored masked, e.g. "••••4521". The full number is never kept.
+  accountNoMasked String?
+  branch          String?
+  ledgerAccountId String           @unique
+  openingBalance  Decimal          @default(0) @db.Decimal(14, 2)
+  /// Cached ledger balance (debits - credits); maintained by the posting engine.
+  balance         Decimal          @default(0) @db.Decimal(14, 2)
+  note            String?
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  createdById     String?
+
+  agency         Agency            @relation(fields: [agencyId], references: [id])
+  vouchers       Voucher[]
+  loans          Loan[]
+  loanPayments   LoanPayment[]
+  payrolls       Payroll[]
+  cheques        Cheque[]
+  refunds        Refund[]
+  receipts       MoneyReceipt[]
+  vendorPayments VendorPayment[]
+  advanceReturns AdvanceReturn[]
+  ledgerAccount  LedgerAccount     @relation(fields: [ledgerAccountId], references: [id])
+  lines          JournalLine[]
+  transfersOut   BalanceTransfer[] @relation("TransferFrom")
+  transfersIn    BalanceTransfer[] @relation("TransferTo")
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+enum PartyType {
+  CLIENT
+  COMBINED
+  VENDOR
+  AGENT
+  EMPLOYEE
+  LOAN_AUTHORITY
+}
+
+model JournalEntry {
+  id           String   @id @default(cuid())
+  agencyId     String
+  number       String
+  /// Business date (Asia/Dhaka calendar day).
+  date         DateTime @db.Date
+  sourceType   String
+  sourceId     String?
+  narration    String
+  isReversal   Boolean  @default(false)
+  /// Set on a reversal entry: the entry it cancels (each entry can be reversed once).
+  reversalOfId String?  @unique
+  createdAt    DateTime @default(now())
+  createdById  String?
+
+  agency     Agency        @relation(fields: [agencyId], references: [id])
+  lines      JournalLine[]
+  reversalOf JournalEntry? @relation("Reversal", fields: [reversalOfId], references: [id])
+  reversedBy JournalEntry? @relation("Reversal")
+
+  @@unique([agencyId, number])
+  @@index([agencyId, sourceType, sourceId])
+  @@index([agencyId, date])
+  @@index([agencyId, createdAt])
+}
+
+model JournalLine {
+  id              String     @id @default(cuid())
+  agencyId        String
+  entryId         String
+  ledgerAccountId String
+  debit           Decimal    @default(0) @db.Decimal(14, 2)
+  credit          Decimal    @default(0) @db.Decimal(14, 2)
+  partyType       PartyType?
+  partyId         String?
+  moneyAccountId  String?
+  memo            String?
+  createdAt       DateTime   @default(now())
+
+  agency        Agency        @relation(fields: [agencyId], references: [id])
+  entry         JournalEntry  @relation(fields: [entryId], references: [id])
+  ledgerAccount LedgerAccount @relation(fields: [ledgerAccountId], references: [id])
+  moneyAccount  MoneyAccount? @relation(fields: [moneyAccountId], references: [id])
+
+  @@index([agencyId, ledgerAccountId, partyType, partyId])
+  @@index([agencyId, partyType, partyId])
+  @@index([agencyId, moneyAccountId])
+  @@index([entryId])
+}
+
+/// A month closed for posting. Absent row = open.
+model AccountingPeriod {
+  id         String    @id @default(cuid())
+  agencyId   String
+  year       Int
+  month      Int
+  isClosed   Boolean   @default(true)
+  closedAt   DateTime?
+  closedById String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  agency Agency @relation(fields: [agencyId], references: [id])
+
+  @@unique([agencyId, year, month])
+}
+
+enum DocumentStatus {
+  POSTED
+  VOID
+}
+
+model BalanceTransfer {
+  id            String         @id @default(cuid())
+  agencyId      String
+  number        String
+  date          DateTime       @db.Date
+  fromAccountId String
+  toAccountId   String
+  amount        Decimal        @db.Decimal(14, 2)
+  /// Bank / transfer fee paid from the source account (Transaction Charges expense).
+  charge        Decimal        @default(0) @db.Decimal(14, 2)
+  note          String?
+  status        DocumentStatus @default(POSTED)
+  voidReason    String?
+  voidedAt      DateTime?
+  voidedById    String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  createdById   String?
+
+  agency      Agency       @relation(fields: [agencyId], references: [id])
+  fromAccount MoneyAccount @relation("TransferFrom", fields: [fromAccountId], references: [id])
+  toAccount   MoneyAccount @relation("TransferTo", fields: [toAccountId], references: [id])
+
+  @@unique([agencyId, number])
+  @@index([agencyId, date])
+  @@index([agencyId, createdAt])
+}
+
+// ─── Invoices (PLAN.md 5 "Invoices", 6.1) ───────────────────────────────────
+
+enum InvoiceType {
+  AIR
+  NON_COMMISSION
+  REISSUE
+  OTHER
+  OTHER_PACKAGE
+  VISA
+  TOUR
+  HAJJ_PRE_REG
+  HAJJ
+  UMRAH
+}
+
+enum InvoiceStatus {
+  DRAFT // saved, nothing posted
+  POSTED // posted, nothing paid
+  PARTIAL // posted, partly paid
+  PAID // posted, fully paid
+  VOID
+  REFUNDED
+}
+
+/// Shared invoice header; lines live in type specific tables.
+model Invoice {
+  id              String        @id @default(cuid())
+  agencyId        String
+  number          String
+  type            InvoiceType
+  clientId        String
+  agentId         String?
+  salesmanId      String?
+  date            DateTime      @db.Date
+  dueDate         DateTime?     @db.Date
+  /// Sum of line client prices.
+  subtotal        Decimal       @default(0) @db.Decimal(14, 2)
+  discount        Decimal       @default(0) @db.Decimal(14, 2)
+  serviceCharge   Decimal       @default(0) @db.Decimal(14, 2)
+  vat             Decimal       @default(0) @db.Decimal(14, 2)
+  /// subtotal - discount + serviceCharge + vat: what the client owes.
+  netTotal        Decimal       @default(0) @db.Decimal(14, 2)
+  /// Sum of line purchase prices (payable to vendors).
+  totalCost       Decimal       @default(0) @db.Decimal(14, 2)
+  /// netTotal - vat - totalCost - agentCommission.
+  profit          Decimal       @default(0) @db.Decimal(14, 2)
+  agentCommission Decimal       @default(0) @db.Decimal(14, 2)
+  /// Sum of live money receipt allocations.
+  paidAmount      Decimal       @default(0) @db.Decimal(14, 2)
+  /// Client credit from live refunds (line client amounts - refund charge).
+  refundCredit    Decimal       @default(0) @db.Decimal(14, 2)
+  /// Cost taken back from vendors by live refunds (vendor amounts - vendor charges).
+  refundCost      Decimal       @default(0) @db.Decimal(14, 2)
+  status          InvoiceStatus @default(DRAFT)
+  note            String?
+  currency        String        @default("BDT")
+  exchangeRate    Decimal       @default(1) @db.Decimal(14, 6)
+  reissueOfId     String?
+  /// Tour / Umrah / Hajj header details (optional).
+  tourGroupId     String?
+  groupId         String?
+  travelDate      DateTime?     @db.Date
+  returnDate      DateTime?     @db.Date
+  postedAt        DateTime?
+  voidReason      String?
+  voidedAt        DateTime?
+  voidedById      String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  createdById     String?
+
+  agency            Agency                   @relation(fields: [agencyId], references: [id])
+  client            Client                   @relation(fields: [clientId], references: [id])
+  agent             Agent?                   @relation(fields: [agentId], references: [id])
+  salesman          Employee?                @relation(fields: [salesmanId], references: [id])
+  airTickets        InvoiceAirTicket[]
+  items             InvoiceItem[]
+  visaLines         InvoiceVisaLine[]
+  reissueLines      InvoiceReissueLine[]
+  quotation         Quotation?
+  refunds           Refund[]
+  allocations       MoneyReceiptAllocation[]
+  tourGroup         TourGroup?               @relation(fields: [tourGroupId], references: [id])
+  group             Group?                   @relation(fields: [groupId], references: [id])
+  setOffAllocations VoucherAllocation[]
+
+  @@unique([agencyId, number])
+  @@index([agencyId, createdAt])
+  @@index([agencyId, type, date])
+  @@index([agencyId, clientId])
+  @@index([agencyId, status])
+  @@index([agencyId, salesmanId])
+}
+
+enum PassengerType {
+  ADT
+  CHD
+  INF
+}
+
+model InvoiceAirTicket {
+  id                String        @id @default(cuid())
+  agencyId          String
+  invoiceId         String
+  sortOrder         Int           @default(0)
+  ticketNo          String
+  pnr               String?
+  gdsPnr            String?
+  gds               String?
+  airlineId         String
+  vendorId          String
+  passengerName     String
+  passengerType     PassengerType @default(ADT)
+  passportNo        String?
+  /// Airport codes in travel order, e.g. "DAC-DXB-DAC".
+  route             String
+  segmentCount      Int           @default(1)
+  journeyDate       DateTime      @db.Date
+  returnDate        DateTime?     @db.Date
+  cabinClass        String?
+  baseFare          Decimal       @db.Decimal(14, 2)
+  /// [{ code, amount }] per tax code.
+  taxes             Json          @default("[]")
+  taxTotal          Decimal       @default(0) @db.Decimal(14, 2)
+  totalFare         Decimal       @db.Decimal(14, 2)
+  commissionPercent Decimal       @default(0) @db.Decimal(7, 4)
+  commissionAmount  Decimal       @default(0) @db.Decimal(14, 2)
+  aitAmount         Decimal       @default(0) @db.Decimal(14, 2)
+  clientPrice       Decimal       @db.Decimal(14, 2)
+  purchasePrice     Decimal       @db.Decimal(14, 2)
+  profit            Decimal       @db.Decimal(14, 2)
+  createdAt         DateTime      @default(now())
+
+  agency   Agency               @relation(fields: [agencyId], references: [id])
+  invoice  Invoice              @relation(fields: [invoiceId], references: [id])
+  airline  Airline              @relation(fields: [airlineId], references: [id])
+  vendor   Vendor               @relation(fields: [vendorId], references: [id])
+  reissues InvoiceReissueLine[]
+
+  @@index([agencyId, ticketNo])
+  @@index([agencyId, createdAt])
+  @@index([agencyId, vendorId])
+  @@index([agencyId, journeyDate])
+  @@index([invoiceId])
+  @@index([agencyId, airlineId])
+}
+
+// ─── Money movement (PLAN.md 6.6, 6.8) ──────────────────────────────────────
+
+enum PaymentMethod {
+  CASH
+  BANK
+  MOBILE
+  CARD
+  CHEQUE
+}
+
+model MoneyReceipt {
+  id                String         @id @default(cuid())
+  agencyId          String
+  number            String
+  clientId          String
+  date              DateTime       @db.Date
+  /// Amount credited to the client.
+  amount            Decimal        @db.Decimal(14, 2)
+  moneyAccountId    String
+  paymentMethod     PaymentMethod  @default(CASH)
+  /// Fee deducted by the bank / wallet (Transaction Charges expense).
+  transactionCharge Decimal        @default(0) @db.Decimal(14, 2)
+  reference         String?
+  note              String?
+  status            DocumentStatus @default(POSTED)
+  voidReason        String?
+  voidedAt          DateTime?
+  voidedById        String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  createdById       String?
+
+  agency       Agency                   @relation(fields: [agencyId], references: [id])
+  cheque       Cheque?
+  client       Client                   @relation(fields: [clientId], references: [id])
+  moneyAccount MoneyAccount             @relation(fields: [moneyAccountId], references: [id])
+  allocations  MoneyReceiptAllocation[]
+
+  @@unique([agencyId, number])
+  @@index([agencyId, createdAt])
+  @@index([agencyId, clientId])
+  @@index([agencyId, date])
+}
+
+model MoneyReceiptAllocation {
+  id        String   @id @default(cuid())
+  agencyId  String
+  receiptId String
+  invoiceId String
+  amount    Decimal  @db.Decimal(14, 2)
+  createdAt DateTime @default(now())
+
+  agency  Agency       @relation(fields: [agencyId], references: [id])
+  receipt MoneyReceipt @relation(fields: [receiptId], references: [id])
+  invoice Invoice      @relation(fields: [invoiceId], references: [id])
+
+  @@unique([receiptId, invoiceId])
+  @@index([agencyId, invoiceId])
+}
+
+model VendorPayment {
+  id                String         @id @default(cuid())
+  agencyId          String
+  number            String
+  vendorId          String
+  date              DateTime       @db.Date
+  amount            Decimal        @db.Decimal(14, 2)
+  moneyAccountId    String
+  paymentMethod     PaymentMethod  @default(BANK)
+  transactionCharge Decimal        @default(0) @db.Decimal(14, 2)
+  reference         String?
+  note              String?
+  status            DocumentStatus @default(POSTED)
+  voidReason        String?
+  voidedAt          DateTime?
+  voidedById        String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  createdById       String?
+
+  agency       Agency       @relation(fields: [agencyId], references: [id])
+  cheque       Cheque?
+  vendor       Vendor       @relation(fields: [vendorId], references: [id])
+  moneyAccount MoneyAccount @relation(fields: [moneyAccountId], references: [id])
+
+  @@unique([agencyId, number])
+  @@index([agencyId, createdAt])
+  @@index([agencyId, vendorId])
+  @@index([agencyId, date])
+}
+
+/// Pays back a client's advance, or receives back an advance paid to a vendor.
+model AdvanceReturn {
+  id             String         @id @default(cuid())
+  agencyId       String
+  number         String
+  partyType      PartyType
+  partyId        String
+  date           DateTime       @db.Date
+  amount         Decimal        @db.Decimal(14, 2)
+  moneyAccountId String
+  note           String?
+  status         DocumentStatus @default(POSTED)
+  voidReason     String?
+  voidedAt       DateTime?
+  voidedById     String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  createdById    String?
+
+  agency       Agency       @relation(fields: [agencyId], references: [id])
+  moneyAccount MoneyAccount @relation(fields: [moneyAccountId], references: [id])
+
+  @@unique([agencyId, number])
+  @@index([agencyId, createdAt])
+  @@index([agencyId, partyType, partyId])
+}
+
+// ─── Line based invoices (PLAN.md 6.5): Other, Other Package, Tour, Umrah ───
+
+enum ItemKind {
+  SERVICE // a product / service line
+  PACKAGE // a package price line
+  ACCOMMODATION
+  TRANSPORT
+  OTHER_TRANSPORT
+  GUIDE
+  FOOD
+  PLACE
+  TOUR_TICKET
+  PILGRIM // one Umrah / Hajj passenger
+}
+
+/// A priced line: what the client pays (qty x unit price) and what it costs
+/// (qty x unit cost, payable to the vendor). Either side may be zero, e.g. a
+/// tour priced as one package line plus itemised cost lines.
+model InvoiceItem {
+  id            String    @id @default(cuid())
+  agencyId      String
+  invoiceId     String
+  sortOrder     Int       @default(0)
+  kind          ItemKind  @default(SERVICE)
+  productId     String?
+  /// Tour itinerary master the line was filled from (accommodation, guide, ...).
+  sourceId      String?
+  description   String
+  qty           Decimal   @default(1) @db.Decimal(10, 2)
+  unitPrice     Decimal   @default(0) @db.Decimal(14, 2)
+  unitCost      Decimal   @default(0) @db.Decimal(14, 2)
+  clientPrice   Decimal   @default(0) @db.Decimal(14, 2)
+  purchasePrice Decimal   @default(0) @db.Decimal(14, 2)
+  profit        Decimal   @default(0) @db.Decimal(14, 2)
+  vendorId      String?
+  /// Passenger details (Umrah / Hajj / package per person).
+  passengerName String?
+  passportNo    String?
+  groupId       String?
+  roomTypeId    String?
+  serviceDate   DateTime? @db.Date
+  /// Hajj lines: the pilgrim this line is for.
+  pilgrimId     String?
+  createdAt     DateTime  @default(now())
+
+  agency   Agency    @relation(fields: [agencyId], references: [id])
+  invoice  Invoice   @relation(fields: [invoiceId], references: [id])
+  pilgrim  Pilgrim?  @relation(fields: [pilgrimId], references: [id])
+  vendor   Vendor?   @relation(fields: [vendorId], references: [id])
+  product  Product?  @relation(fields: [productId], references: [id])
+  group    Group?    @relation(fields: [groupId], references: [id])
+  roomType RoomType? @relation(fields: [roomTypeId], references: [id])
+
+  @@index([agencyId, createdAt])
+  @@index([agencyId, vendorId])
+  @@index([invoiceId])
+  @@index([pilgrimId])
+}
+
+// ─── Visa (PLAN.md 6.4) ─────────────────────────────────────────────────────
+
+enum VisaStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+  DELIVERED
+}
+
+model InvoiceVisaLine {
+  id              String     @id @default(cuid())
+  agencyId        String
+  invoiceId       String
+  sortOrder       Int        @default(0)
+  country         String
+  visaTypeId      String?
+  passengerName   String
+  passportNo      String?
+  vendorId        String
+  clientPrice     Decimal    @db.Decimal(14, 2)
+  purchasePrice   Decimal    @db.Decimal(14, 2)
+  profit          Decimal    @db.Decimal(14, 2)
+  status          VisaStatus @default(PENDING)
+  statusChangedAt DateTime   @default(now())
+  /// [{ status, at, by, note }] newest last.
+  statusHistory   Json       @default("[]")
+  expectedDate    DateTime?  @db.Date
+  deliveryDate    DateTime?  @db.Date
+  note            String?
+  createdAt       DateTime   @default(now())
+
+  agency   Agency    @relation(fields: [agencyId], references: [id])
+  invoice  Invoice   @relation(fields: [invoiceId], references: [id])
+  vendor   Vendor    @relation(fields: [vendorId], references: [id])
+  visaType VisaType? @relation(fields: [visaTypeId], references: [id])
+
+  @@index([agencyId, createdAt])
+  @@index([agencyId, status])
+  @@index([agencyId, vendorId])
+  @@index([invoiceId])
+}
+
+// ─── Reissue and refund (PLAN.md 6.3, 6.7) ─────────────────────────────────
+
+/// One reissued ticket: charges only the change (penalty, fare difference, our charge).
+model InvoiceReissueLine {
+  id               String    @id @default(cuid())
+  agencyId         String
+  invoiceId        String
+  sortOrder        Int       @default(0)
+  originalTicketId String
+  /// New ticket number when the airline issues one.
+  ticketNo         String?
+  pnr              String?
+  passengerName    String
+  route            String
+  airlineId        String
+  vendorId         String
+  journeyDate      DateTime  @db.Date
+  returnDate       DateTime? @db.Date
+  /// Airline penalty (payable to the vendor and charged to the client).
+  penalty          Decimal   @default(0) @db.Decimal(14, 2)
+  /// Fare difference (payable to the vendor and charged to the client).
+  fareDifference   Decimal   @default(0) @db.Decimal(14, 2)
+  /// Agency charge (client only; this is the profit).
+  serviceCharge    Decimal   @default(0) @db.Decimal(14, 2)
+  clientPrice      Decimal   @db.Decimal(14, 2)
+  purchasePrice    Decimal   @db.Decimal(14, 2)
+  profit           Decimal   @db.Decimal(14, 2)
+  createdAt        DateTime  @default(now())
+
+  agency         Agency           @relation(fields: [agencyId], references: [id])
+  invoice        Invoice          @relation(fields: [invoiceId], references: [id])
+  originalTicket InvoiceAirTicket @relation(fields: [originalTicketId], references: [id])
+  airline        Airline          @relation(fields: [airlineId], references: [id])
+  vendor         Vendor           @relation(fields: [vendorId], references: [id])
+
+  @@index([agencyId, createdAt])
+  @@index([agencyId, originalTicketId])
+  @@index([agencyId, journeyDate])
+  @@index([invoiceId])
+}
+
+enum RefundType {
+  AIR
+  OTHER
+  TOUR
+  PARTIAL
+  OTHER_PACKAGE_HAJJ
+}
+
+enum RefundMethod {
+  CASH_RETURN
+  ADJUST_TO_BALANCE
+}
+
+enum RefundStatus {
+  POSTED
+  VOID
+}
+
+enum RefundLineKind {
+  TICKET
+  REISSUE
+  ITEM
+  VISA
+}
+
+model Refund {
+  id                 String       @id @default(cuid())
+  agencyId           String
+  number             String
+  type               RefundType
+  invoiceId          String
+  clientId           String
+  date               DateTime     @db.Date
+  /// Sum of line client amounts: sales taken back off the client.
+  clientRefundAmount Decimal      @db.Decimal(14, 2)
+  /// Kept from the client as refund charge income.
+  clientCharge       Decimal      @default(0) @db.Decimal(14, 2)
+  /// Sum of line vendor amounts: cost taken back off the vendor.
+  vendorRefundAmount Decimal      @db.Decimal(14, 2)
+  /// Sum of line vendor charges.
+  vendorCharge       Decimal      @default(0) @db.Decimal(14, 2)
+  method             RefundMethod
+  /// Paid back to the client now (cash return only).
+  returnAmount       Decimal      @default(0) @db.Decimal(14, 2)
+  moneyAccountId     String?
+  status             RefundStatus @default(POSTED)
+  note               String?
+  voidReason         String?
+  voidedAt           DateTime?
+  voidedById         String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  createdById        String?
+
+  agency       Agency        @relation(fields: [agencyId], references: [id])
+  invoice      Invoice       @relation(fields: [invoiceId], references: [id])
+  client       Client        @relation(fields: [clientId], references: [id])
+  moneyAccount MoneyAccount? @relation(fields: [moneyAccountId], references: [id])
+  lines        RefundLine[]
+
+  @@unique([agencyId, number])
+  @@index([agencyId, createdAt])
+  @@index([agencyId, type, date])
+  @@index([agencyId, invoiceId])
+  @@index([agencyId, clientId])
+}
+
+model RefundLine {
+  id           String         @id @default(cuid())
+  agencyId     String
+  refundId     String
+  lineKind     RefundLineKind
+  /// Id of the refunded invoice line (ticket, reissue, item or visa line).
+  lineId       String
+  description  String
+  vendorId     String?
+  clientAmount Decimal        @db.Decimal(14, 2)
+  vendorAmount Decimal        @default(0) @db.Decimal(14, 2)
+  vendorCharge Decimal        @default(0) @db.Decimal(14, 2)
+
+  agency Agency  @relation(fields: [agencyId], references: [id])
+  refund Refund  @relation(fields: [refundId], references: [id])
+  vendor Vendor? @relation(fields: [vendorId], references: [id])
+
+  @@index([agencyId, lineId])
+  @@index([refundId])
+}
+
+// ─── Hajj (PLAN.md 6.5, 6.17) ───────────────────────────────────────────────
+
+enum PilgrimStatus {
+  PRE_REGISTERED
+  REGISTERED
+  TRANSFERRED_IN
+  TRANSFERRED_OUT
+  CANCELLED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+/// A Hajji. `clientId` is who pays for them (often a family head).
+model Pilgrim {
+  id              String        @id @default(cuid())
+  agencyId        String
+  clientId        String
+  name            String
+  gender          Gender?
+  dateOfBirth     DateTime?     @db.Date
+  passportNo      String?
+  passportExpiry  DateTime?     @db.Date
+  nidNo           String?
+  phone           String?
+  address         String?
+  hajjYear        Int
+  /// Government tracking number (from pre registration).
+  trackingNo      String?
+  preRegNo        String?
+  preRegDate      DateTime?     @db.Date
+  regNo           String?
+  regDate         DateTime?     @db.Date
+  voucherNo       String?
+  groupId         String?
+  /// Relation of the escort (Maharam master), and the escort's name.
+  maharamId       String?
+  maharamName     String?
+  moallem         String?
+  status          PilgrimStatus @default(PRE_REGISTERED)
+  /// Other agency for transfers in / out.
+  transferredFrom String?
+  transferredTo   String?
+  cancelledDate   DateTime?     @db.Date
+  cancelReason    String?
+  note            String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  createdById     String?
+
+  agency        Agency             @relation(fields: [agencyId], references: [id])
+  client        Client             @relation(fields: [clientId], references: [id])
+  group         Group?             @relation(fields: [groupId], references: [id])
+  maharam       Maharam?           @relation(fields: [maharamId], references: [id])
+  events        PilgrimEvent[]
+  transferLines HajjTransferLine[]
+  invoiceItems  InvoiceItem[]
+
+  @@index([agencyId, createdAt])
+  @@index([agencyId, hajjYear, status])
+  @@index([agencyId, trackingNo])
+  @@index([agencyId, clientId])
+}
+
+enum PilgrimEventType {
+  CREATED
+  UPDATED
+  REGISTERED
+  MOALLEM_TRANSFER
+  GROUP_TRANSFER
+  TRANSFER_IN
+  TRANSFER_OUT
+  CANCELLED_PRE_REG
+  CANCELLED_REG
+  TRANSFER_VOIDED
+}
+
+/// History of a pilgrim (status changes, transfers, cancellations).
+model PilgrimEvent {
+  id          String           @id @default(cuid())
+  agencyId    String
+  pilgrimId   String
+  type        PilgrimEventType
+  date        DateTime         @db.Date
+  fromValue   String?
+  toValue     String?
+  note        String?
+  transferId  String?
+  createdAt   DateTime         @default(now())
+  createdById String?
+
+  agency  Agency  @relation(fields: [agencyId], references: [id])
+  pilgrim Pilgrim @relation(fields: [pilgrimId], references: [id])
+
+  @@index([agencyId, createdAt])
+  @@index([pilgrimId])
+}
+
+enum HajjTransferType {
+  MOALLEM
+  GROUP
+  IN
+  OUT
+}
+
+model HajjTransfer {
+  id               String           @id @default(cuid())
+  agencyId         String
+  number           String
+  type             HajjTransferType
+  date             DateTime         @db.Date
+  /// New moallem, group name or the other agency.
+  toLabel          String
+  toGroupId        String?
+  chargePerPilgrim Decimal          @default(0) @db.Decimal(14, 2)
+  totalCharge      Decimal          @default(0) @db.Decimal(14, 2)
+  status           DocumentStatus   @default(POSTED)
+  note             String?
+  voidReason       String?
+  voidedAt         DateTime?
+  voidedById       String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  createdById      String?
+
+  agency  Agency             @relation(fields: [agencyId], references: [id])
+  toGroup Group?             @relation(fields: [toGroupId], references: [id])
+  lines   HajjTransferLine[]
+
+  @@unique([agencyId, number])
+  @@index([agencyId, createdAt])
+  @@index([agencyId, type, date])
+}
+
+/// One pilgrim in a transfer, with what they had before (for void).
+model HajjTransferLine {
+  id         String         @id @default(cuid())
+  agencyId   String
+  transferId String
+  pilgrimId  String
+  clientId   String
+  fromValue  String?
+  fromStatus PilgrimStatus?
+  charge     Decimal        @default(0) @db.Decimal(14, 2)
+
+  agency   Agency       @relation(fields: [agencyId], references: [id])
+  transfer HajjTransfer @relation(fields: [transferId], references: [id])
+  pilgrim  Pilgrim      @relation(fields: [pilgrimId], references: [id])
+
+  @@index([transferId])
+  @@index([agencyId, pilgrimId])
+}
+
+// ─── Vouchers, expense, loans, payroll, cheques (PLAN.md 6.9 to 6.13) ───────
+
+/// One head of expense; each has its own ledger account so the P&L shows it.
+model ExpenseHead {
+  id              String   @id @default(cuid())
+  agencyId        String
+  name            String
+  ledgerAccountId String   @unique
+  note            String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdById     String?
+
+  agency        Agency        @relation(fields: [agencyId], references: [id])
+  ledgerAccount LedgerAccount @relation(fields: [ledgerAccountId], references: [id])
+  vouchers      Voucher[]
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+enum VoucherKind {
+  EXPENSE
+  NON_INVOICE_INCOME
+  INCENTIVE_INCOME
+  AGENT_PAYMENT
+  EMPLOYEE_ADVANCE
+  BILL_ADJUSTMENT
+  INVESTMENT
+  INVESTMENT_RETURN
+  /// Combined client: receivable (client side) set off against payable (vendor side).
+  SET_OFF
+}
+
+enum AdjustDirection {
+  INCREASE_DUE
+  DECREASE_DUE
+}
+
+/// Simple two-sided money documents (expense, other income, agent payment,
+/// employee advance, bill adjustment, investments). Rules per kind live in
+/// src/server/accounting/voucherPosting.ts.
+model Voucher {
+  id             String           @id @default(cuid())
+  agencyId       String
+  number         String
+  kind           VoucherKind
+  date           DateTime         @db.Date
+  amount         Decimal          @db.Decimal(14, 2)
+  /// Gain on an investment return (on top of the amount).
+  profit         Decimal          @default(0) @db.Decimal(14, 2)
+  moneyAccountId String?
+  partyType      PartyType?
+  partyId        String?
+  expenseHeadId  String?
+  direction      AdjustDirection?
+  /// Investment return: the investment it returns.
+  investmentId   String?
+  /// Investment: its name (e.g. "FDR City Bank").
+  title          String?
+  reference      String?
+  note           String?
+  status         DocumentStatus   @default(POSTED)
+  voidReason     String?
+  voidedAt       DateTime?
+  voidedById     String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  createdById    String?
+
+  agency       Agency              @relation(fields: [agencyId], references: [id])
+  moneyAccount MoneyAccount?       @relation(fields: [moneyAccountId], references: [id])
+  expenseHead  ExpenseHead?        @relation(fields: [expenseHeadId], references: [id])
+  investment   Voucher?            @relation("InvestmentReturns", fields: [investmentId], references: [id])
+  returns      Voucher[]           @relation("InvestmentReturns")
+  allocations  VoucherAllocation[]
+  attachments  Attachment[]
+
+  @@unique([agencyId, number])
+  @@index([agencyId, createdAt])
+  @@index([agencyId, kind, date])
+  @@index([agencyId, partyType, partyId])
+  @@index([investmentId])
+}
+
+/// A small file kept with a document (e.g. an expense bill). Stored in the DB.
+model Attachment {
+  id          String   @id @default(cuid())
+  agencyId    String
+  voucherId   String?
+  passportId  String?
+  fileName    String
+  mimeType    String
+  size        Int
+  data        Bytes
+  createdAt   DateTime @default(now())
+  createdById String?
+
+  agency   Agency    @relation(fields: [agencyId], references: [id])
+  voucher  Voucher?  @relation(fields: [voucherId], references: [id])
+  passport Passport? @relation(fields: [passportId], references: [id])
+
+  @@index([agencyId, createdAt])
+  @@index([voucherId])
+  @@index([passportId])
+}
+
+enum LoanAuthorityType {
+  BANK
+  PERSON
+  COMPANY
+}
+
+/// Lender, borrower or investor. Balance: positive = they owe the agency.
+model LoanAuthority {
+  id          String            @id @default(cuid())
+  agencyId    String
+  name        String
+  type        LoanAuthorityType @default(BANK)
+  phone       String?
+  address     String?
+  note        String?
+  balance     Decimal           @default(0) @db.Decimal(14, 2)
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  createdById String?
+
+  agency Agency @relation(fields: [agencyId], references: [id])
+  loans  Loan[]
+
+  @@unique([agencyId, name])
+  @@index([agencyId, createdAt])
+}
+
+enum LoanKind {
+  TAKEN
+  GIVEN
+  INVESTMENT
+}
+
+enum LoanStatus {
+  ACTIVE
+  CLOSED
+  VOID
+}
+
+model Loan {
+  id             String     @id @default(cuid())
+  agencyId       String
+  number         String
+  kind           LoanKind
+  authorityId    String
+  date           DateTime   @db.Date
+  principal      Decimal    @db.Decimal(14, 2)
+  /// Yearly rate in percent (0 for none).
+  interestRate   Decimal    @default(0) @db.Decimal(7, 4)
+  termMonths     Int?
+  moneyAccountId String
+  /// Principal repaid by live payments (cached).
+  repaid         Decimal    @default(0) @db.Decimal(14, 2)
+  note           String?
+  status         LoanStatus @default(ACTIVE)
+  voidReason     String?
+  voidedAt       DateTime?
+  voidedById     String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  createdById    String?
+
+  agency       Agency        @relation(fields: [agencyId], references: [id])
+  authority    LoanAuthority @relation(fields: [authorityId], references: [id])
+  moneyAccount MoneyAccount  @relation(fields: [moneyAccountId], references: [id])
+  payments     LoanPayment[]
+
+  @@unique([agencyId, number])
+  @@index([agencyId, createdAt])
+  @@index([agencyId, kind, date])
+}
+
+/// Installment paid on a loan taken / investment received, or received on a loan given.
+model LoanPayment {
+  id             String         @id @default(cuid())
+  agencyId       String
+  number         String
+  loanId         String
+  date           DateTime       @db.Date
+  principal      Decimal        @default(0) @db.Decimal(14, 2)
+  interest       Decimal        @default(0) @db.Decimal(14, 2)
+  moneyAccountId String
+  note           String?
+  status         DocumentStatus @default(POSTED)
+  voidReason     String?
+  voidedAt       DateTime?
+  voidedById     String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  createdById    String?
+
+  agency       Agency       @relation(fields: [agencyId], references: [id])
+  loan         Loan         @relation(fields: [loanId], references: [id])
+  moneyAccount MoneyAccount @relation(fields: [moneyAccountId], references: [id])
+
+  @@unique([agencyId, number])
+  @@index([agencyId, createdAt])
+  @@index([loanId])
+}
+
+model Payroll {
+  id              String         @id @default(cuid())
+  agencyId        String
+  number          String
+  employeeId      String
+  /// Salary month, "YYYY-MM".
+  month           String
+  date            DateTime       @db.Date
+  basic           Decimal        @db.Decimal(14, 2)
+  /// [{ name, amount }]
+  allowances      Json           @default("[]")
+  allowanceTotal  Decimal        @default(0) @db.Decimal(14, 2)
+  /// [{ name, amount }]
+  deductions      Json           @default("[]")
+  deductionTotal  Decimal        @default(0) @db.Decimal(14, 2)
+  advanceAdjusted Decimal        @default(0) @db.Decimal(14, 2)
+  netPaid         Decimal        @db.Decimal(14, 2)
+  moneyAccountId  String
+  note            String?
+  status          DocumentStatus @default(POSTED)
+  voidReason      String?
+  voidedAt        DateTime?
+  voidedById      String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  createdById     String?
+
+  agency       Agency       @relation(fields: [agencyId], references: [id])
+  employee     Employee     @relation(fields: [employeeId], references: [id])
+  moneyAccount MoneyAccount @relation(fields: [moneyAccountId], references: [id])
+
+  @@unique([agencyId, number])
+  @@index([agencyId, createdAt])
+  @@index([agencyId, employeeId, month])
+}
+
+enum ChequeDirection {
+  RECEIVED
+  ISSUED
+}
+
+enum ChequeStatus {
+  PENDING
+  DEPOSITED
+  CLEARED
+  BOUNCED
+  CANCELLED
+}
+
+/// A cheque received with a money receipt or issued with a vendor payment.
+model Cheque {
+  id              String          @id @default(cuid())
+  agencyId        String
+  direction       ChequeDirection
+  chequeNo        String
+  bankName        String
+  chequeDate      DateTime        @db.Date
+  amount          Decimal         @db.Decimal(14, 2)
+  status          ChequeStatus    @default(PENDING)
+  partyType       PartyType
+  partyId         String
+  receiptId       String?         @unique
+  vendorPaymentId String?         @unique
+  /// Our bank account it goes into (received) or is drawn on (issued).
+  moneyAccountId  String
+  depositedDate   DateTime?       @db.Date
+  clearedDate     DateTime?       @db.Date
+  bouncedDate     DateTime?       @db.Date
+  /// [{ status, at, by, note }]
+  history         Json            @default("[]")
+  note            String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  createdById     String?
+
+  agency        Agency         @relation(fields: [agencyId], references: [id])
+  receipt       MoneyReceipt?  @relation(fields: [receiptId], references: [id])
+  vendorPayment VendorPayment? @relation(fields: [vendorPaymentId], references: [id])
+  moneyAccount  MoneyAccount   @relation(fields: [moneyAccountId], references: [id])
+
+  @@index([agencyId, createdAt])
+  @@index([agencyId, status, chequeDate])
+}
+
+// ─── Passports and quotations (PLAN.md 6.15, 6.16) ──────────────────────────
+
+/// A passport the agency holds or tracks for a client.
+model Passport {
+  id            String    @id @default(cuid())
+  agencyId      String
+  passportNo    String
+  name          String
+  clientId      String?
+  gender        Gender?
+  dateOfBirth   DateTime? @db.Date
+  nationality   String    @default("Bangladeshi")
+  placeOfIssue  String?
+  issueDate     DateTime? @db.Date
+  expiryDate    DateTime  @db.Date
+  phone         String?
+  statusId      String?
+  /// [{ status, at, by, note }]
+  statusHistory Json      @default("[]")
+  /// Passport physically with the agency since / handed back on.
+  receivedDate  DateTime? @db.Date
+  returnedDate  DateTime? @db.Date
+  note          String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String?
+
+  agency      Agency          @relation(fields: [agencyId], references: [id])
+  client      Client?         @relation(fields: [clientId], references: [id])
+  status      PassportStatus? @relation(fields: [statusId], references: [id])
+  attachments Attachment[]
+
+  @@unique([agencyId, passportNo])
+  @@index([agencyId, createdAt])
+  @@index([agencyId, expiryDate])
+  @@index([agencyId, clientId])
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  CONVERTED
+}
+
+model Quotation {
+  id                 String          @id @default(cuid())
+  agencyId           String
+  number             String
+  clientId           String
+  date               DateTime        @db.Date
+  validUntil         DateTime        @db.Date
+  subject            String?
+  /// Invoice type it becomes when converted (a line based type).
+  invoiceType        InvoiceType     @default(OTHER)
+  subtotal           Decimal         @default(0) @db.Decimal(14, 2)
+  discount           Decimal         @default(0) @db.Decimal(14, 2)
+  netTotal           Decimal         @default(0) @db.Decimal(14, 2)
+  note               String?
+  terms              String?
+  status             QuotationStatus @default(DRAFT)
+  convertedInvoiceId String?         @unique
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  createdById        String?
+
+  agency           Agency          @relation(fields: [agencyId], references: [id])
+  client           Client          @relation(fields: [clientId], references: [id])
+  convertedInvoice Invoice?        @relation(fields: [convertedInvoiceId], references: [id])
+  lines            QuotationLine[]
+
+  @@unique([agencyId, number])
+  @@index([agencyId, createdAt])
+  @@index([agencyId, clientId])
+  @@index([agencyId, status])
+}
+
+model QuotationLine {
+  id          String  @id @default(cuid())
+  agencyId    String
+  quotationId String
+  sortOrder   Int     @default(0)
+  description String
+  qty         Decimal @default(1) @db.Decimal(10, 2)
+  unitPrice   Decimal @default(0) @db.Decimal(14, 2)
+  amount      Decimal @default(0) @db.Decimal(14, 2)
+  /// Optional cost side, carried to the invoice on conversion.
+  unitCost    Decimal @default(0) @db.Decimal(14, 2)
+  vendorId    String?
+  productId   String?
+
+  agency    Agency    @relation(fields: [agencyId], references: [id])
+  quotation Quotation @relation(fields: [quotationId], references: [id])
+  vendor    Vendor?   @relation(fields: [vendorId], references: [id])
+  product   Product?  @relation(fields: [productId], references: [id])
+
+  @@index([quotationId])
+}
+
+// ─── SMS, notifications, feedback, platform admin (PLAN.md Phase 12) ────────
+
+enum SmsStatus {
+  SENT
+  FAILED
+  SIMULATED
+}
+
+/// Every SMS the agency sent (or tried to), with the gateway's answer.
+model SmsLog {
+  id          String    @id @default(cuid())
+  agencyId    String
+  to          String
+  message     String
+  /// What triggered it: MANUAL, VISA_APPROVED, VISA_DELIVERED, PASSPORT_EXPIRY, ...
+  event       String
+  status      SmsStatus
+  providerRef String?
+  error       String?
+  relatedType String?
+  relatedId   String?
+  createdAt   DateTime  @default(now())
+  createdById String?
+
+  agency Agency @relation(fields: [agencyId], references: [id])
+
+  @@index([agencyId, createdAt])
+  @@index([agencyId, relatedType, relatedId])
+}
+
+/// In-app notification for one user.
+model Notification {
+  id        String    @id @default(cuid())
+  agencyId  String
+  userId    String
+  kind      String
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  agency Agency @relation(fields: [agencyId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([agencyId, userId, readAt])
+  @@index([agencyId, createdAt])
+}
+
+enum FeedbackKind {
+  BUG
+  IDEA
+  QUESTION
+  OTHER
+}
+
+enum FeedbackStatus {
+  OPEN
+  DONE
+}
+
+model Feedback {
+  id         String         @id @default(cuid())
+  agencyId   String
+  userId     String?
+  kind       FeedbackKind   @default(IDEA)
+  message    String
+  page       String?
+  status     FeedbackStatus @default(OPEN)
+  reply      String?
+  resolvedAt DateTime?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  agency Agency @relation(fields: [agencyId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id])
+
+  @@index([agencyId, createdAt])
+  @@index([agencyId, status])
+}
+
+/// One-time, short-lived token a platform admin uses to open an agency as its
+/// owner. Platform level (no agencyId); only the admin service touches it.
+model ImpersonationToken {
+  id           String    @id @default(cuid())
+  tokenHash    String    @unique
+  adminUserId  String
+  targetUserId String
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([adminUserId, createdAt])
+}
+
+/// Set-off: part of a combined client's receivable settled on an invoice
+/// (like a receipt allocation, paid from what we owe them instead of cash).
+model VoucherAllocation {
+  id        String   @id @default(cuid())
+  agencyId  String
+  voucherId String
+  invoiceId String
+  amount    Decimal  @db.Decimal(14, 2)
+  createdAt DateTime @default(now())
+
+  agency  Agency  @relation(fields: [agencyId], references: [id])
+  voucher Voucher @relation(fields: [voucherId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@unique([voucherId, invoiceId])
+  @@index([agencyId, invoiceId])
+}

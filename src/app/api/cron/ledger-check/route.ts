@@ -8,6 +8,9 @@ import { tenantDb } from "@/server/db/tenant";
 import { notify } from "@/server/services/notifications/notificationService";
 import { cronAuthorised as authorised } from "@/server/cron/auth";
 
+// PDFs, exports and nightly jobs can take longer than the platform default.
+export const maxDuration = 60;
+
 export async function GET(req: NextRequest) {
   if (!authorised(req)) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
 

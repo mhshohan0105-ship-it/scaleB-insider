@@ -20,6 +20,9 @@ import { getReissueInvoice } from "@/server/services/invoices/reissueInvoiceServ
 import { getVisaInvoice } from "@/server/services/invoices/visaInvoiceService";
 import { getAppConfig, getProfile } from "@/server/services/settings/settingsService";
 
+// PDFs, exports and nightly jobs can take longer than the platform default.
+export const maxDuration = 60;
+
 async function loadDocument(
   ctx: ServiceContext,
   type: InvoiceTypeKey,

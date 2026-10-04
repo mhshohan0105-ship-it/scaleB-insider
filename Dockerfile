@@ -7,7 +7,7 @@ COPY package.json package-lock.json ./
 COPY prisma ./prisma
 RUN npm ci
 COPY . .
-RUN npx prisma generate && npm run build
+RUN npx prisma generate && NEXT_OUTPUT=standalone npm run build
 
 # Stage 2: small runtime image, runs as a non-root user.
 FROM node:22-bookworm-slim AS run

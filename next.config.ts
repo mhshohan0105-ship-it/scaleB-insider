@@ -19,8 +19,9 @@ const nextConfig: NextConfig = {
   // Lets the Playwright dev server build into its own folder so it never
   // clobbers a dev server that is already running on .next.
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
-  // Self-contained server build for the Docker image (DEPLOYMENT.md).
-  output: "standalone",
+  // Self-contained server build for the Docker image only (the Dockerfile sets
+  // NEXT_OUTPUT=standalone); Vercel and `next start` use the normal output.
+  ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" as const } : {}),
   poweredByHeader: false,
   serverExternalPackages: ["bcryptjs", "@react-pdf/renderer", "exceljs"],
   async headers() {

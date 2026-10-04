@@ -8,6 +8,9 @@ import { QuotationPdf } from "@/server/pdf/QuotationPdf";
 import { getQuotation } from "@/server/services/quotations/quotationService";
 import { getAppConfig, getProfile } from "@/server/services/settings/settingsService";
 
+// PDFs, exports and nightly jobs can take longer than the platform default.
+export const maxDuration = 60;
+
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getUserContext();

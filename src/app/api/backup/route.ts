@@ -3,6 +3,9 @@ import { can } from "@/lib/permissions";
 import { getUserContext, toServiceContext } from "@/server/auth/session";
 import { exportTenantData } from "@/server/services/backup/backupService";
 
+// PDFs, exports and nightly jobs can take longer than the platform default.
+export const maxDuration = 60;
+
 export async function GET() {
   const user = await getUserContext();
   if (!can(user.permissions, "configuration", "export")) {

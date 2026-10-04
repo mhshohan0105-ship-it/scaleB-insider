@@ -237,3 +237,14 @@ Decision (owner, 2026-09-30): the receivable and the payable of a combined clien
 - Reports: the Party Ledger of a combined client is the merged ledger; Due & Advance for combined clients shows each one's net (noted: their client and vendor accounts also appear in the Clients and Vendors reports). Balance Sheet and dashboard keep receivable and payable gross.
 
 Acceptance (verified): unit test for the set-off lines (Dr AP vendor / Cr AR client). Integration test: accounts created and exclusive; a 50,000 sale and a 30,000 purchase give AR 50,000 / AP 30,000 and a net of 20,000 on the profile, merged ledger and due report; set-off limited to 30,000, allocated to the invoice (partial), void restores both sides and the invoice; books balance and cached balances match. Playwright: create a combined client, sell to it and buy from it, see the net and the parts, set off, see the Set-offs tab and the tagged ledger.
+
+## Vercel + Neon deployment (2026-10-05)
+
+- `vercel.json`: Singapore region and the two daily jobs (ledger check 01:30, daily 09:00 Dhaka); Vercel's cron header matches `CRON_SECRET`.
+- `vercel-build` script: Prisma generate, migrations over the direct (unpooled) connection, Next build.
+- A pooled Neon connection string gets `pgbouncer=true` and a wake-up timeout at runtime (`src/server/db/connectionUrl.ts`, unit tested); other URLs are unchanged.
+- PDF, export, backup and cron routes allow up to 60 seconds.
+- The standalone server build is now only for the Docker image (`NEXT_OUTPUT=standalone`), which also removes the `next start` warning in the e2e run.
+- DEPLOYMENT.md: step by step for Vercel with Neon.
+
+Verified: `npm run check` green (210 unit + 118 integration); the `vercel-build` script builds cleanly against a local database. Not yet verified on Vercel itself.

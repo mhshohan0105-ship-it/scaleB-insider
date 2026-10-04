@@ -13,6 +13,9 @@ import { tenantDb } from "@/server/db/tenant";
 import { notify, pruneNotifications } from "@/server/services/notifications/notificationService";
 import { sendPassportReminders } from "@/server/services/sms/smsService";
 
+// PDFs, exports and nightly jobs can take longer than the platform default.
+export const maxDuration = 60;
+
 export async function GET(req: NextRequest) {
   if (!cronAuthorised(req)) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
   const today = todayIso();

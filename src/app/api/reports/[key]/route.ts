@@ -14,6 +14,9 @@ import { REPORTS, isReportKey } from "@/server/reports/registry";
 import { ServiceError } from "@/server/services/errors";
 import { getProfile } from "@/server/services/settings/settingsService";
 
+// PDFs, exports and nightly jobs can take longer than the platform default.
+export const maxDuration = 60;
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ key: string }> }) {
   const { key } = await params;
   if (!isReportKey(key)) return NextResponse.json({ error: "Unknown report" }, { status: 404 });

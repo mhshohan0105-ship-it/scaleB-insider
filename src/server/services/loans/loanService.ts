@@ -181,7 +181,7 @@ export async function createLoan(
 export async function voidLoan(ctx: ServiceContext, id: string, input: unknown) {
   const { reason } = voidSchema.parse(input);
   await tenantDb(ctx.agencyId).$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM "Loan" WHERE id = ${id} AND "agencyId" = ${ctx.agencyId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM \`Loan\` WHERE id = ${id} AND \`agencyId\` = ${ctx.agencyId} FOR UPDATE`;
     const before = await tx.loan.findFirst({ where: { id } });
     if (!before) throw new NotFoundError("Loan");
     if (before.status === "VOID") throw new ServiceError("This loan is already void");
@@ -211,7 +211,7 @@ export async function createLoanPayment(
   const interest = new Prisma.Decimal(data.interest);
   const total = principal.plus(interest);
   return tenantDb(ctx.agencyId).$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM "Loan" WHERE id = ${data.loanId} AND "agencyId" = ${ctx.agencyId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM \`Loan\` WHERE id = ${data.loanId} AND \`agencyId\` = ${ctx.agencyId} FOR UPDATE`;
     const loan = await tx.loan.findFirst({
       where: { id: data.loanId },
       include: { authority: true },
@@ -290,7 +290,7 @@ export async function voidLoanPayment(ctx: ServiceContext, id: string, input: un
   await tenantDb(ctx.agencyId).$transaction(async (tx) => {
     const found = await tx.loanPayment.findFirst({ where: { id }, select: { loanId: true } });
     if (!found) throw new NotFoundError("Payment");
-    await tx.$queryRaw`SELECT id FROM "Loan" WHERE id = ${found.loanId} AND "agencyId" = ${ctx.agencyId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM \`Loan\` WHERE id = ${found.loanId} AND \`agencyId\` = ${ctx.agencyId} FOR UPDATE`;
     const before = await tx.loanPayment.findFirst({ where: { id }, include: { loan: true } });
     if (!before) throw new NotFoundError("Payment");
     if (before.status === "VOID") throw new ServiceError("This payment is already void");
@@ -347,10 +347,7 @@ export async function listLoans(
   const where: Prisma.LoanWhereInput = { kind: { in: [...kinds] } };
   const text = params.q?.trim();
   if (text)
-    where.OR = [
-      { number: { contains: text, mode: "insensitive" } },
-      { authority: { name: { contains: text, mode: "insensitive" } } },
-    ];
+    where.OR = [{ number: { contains: text } }, { authority: { name: { contains: text } } }];
   const [rows, total, sums] = await Promise.all([
     db.loan.findMany({
       where,
@@ -482,9 +479,9 @@ export async function listLoanPayments(ctx: ServiceContext, params: ListParams) 
   const text = params.q?.trim();
   if (text)
     where.OR = [
-      { number: { contains: text, mode: "insensitive" } },
-      { loan: { number: { contains: text, mode: "insensitive" } } },
-      { loan: { authority: { name: { contains: text, mode: "insensitive" } } } },
+      { number: { contains: text } },
+      { loan: { number: { contains: text } } },
+      { loan: { authority: { name: { contains: text } } } },
     ];
   const [rows, total] = await Promise.all([
     db.loanPayment.findMany({

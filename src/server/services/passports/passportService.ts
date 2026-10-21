@@ -199,10 +199,10 @@ export async function listPassports(ctx: ServiceContext, q: PassportListQuery, t
   const text = q.q?.trim();
   if (text)
     where.OR = [
-      { passportNo: { contains: text, mode: "insensitive" } },
-      { name: { contains: text, mode: "insensitive" } },
+      { passportNo: { contains: text } },
+      { name: { contains: text } },
       { phone: { contains: text } },
-      { client: { name: { contains: text, mode: "insensitive" } } },
+      { client: { name: { contains: text } } },
     ];
   const [rows, total] = await Promise.all([
     db.passport.findMany({

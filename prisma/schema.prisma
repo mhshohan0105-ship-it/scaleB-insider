@@ -5,10 +5,12 @@
 
 generator client {
   provider = "prisma-client-js"
+  // native = this computer; the rest = Linux hosts (CloudLinux/RHEL cPanel servers, Docker).
+  binaryTargets = ["native", "rhel-openssl-1.1.x", "rhel-openssl-3.0.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -23,19 +25,19 @@ enum AgencyStatus {
 model Agency {
   id              String       @id @default(cuid())
   code            String       @unique // short login code, e.g. "demo"
-  name            String
-  logoUrl         String?
-  address         String?
-  phone           String?
-  email           String?
-  website         String?
-  tradeLicense    String?
-  iataNo          String?
-  currency        String       @default("BDT")
+  name            String       @db.Text
+  logoUrl         String?      @db.Text
+  address         String?      @db.Text
+  phone           String?      @db.Text
+  email           String?      @db.Text
+  website         String?      @db.Text
+  tradeLicense    String?      @db.Text
+  iataNo          String?      @db.Text
+  currency        String       @default("BDT") @db.Text
   fiscalYearStart Int          @default(7) // month number, BD fiscal year starts July
-  invoiceFooter   String?
+  invoiceFooter   String?      @db.Text
   status          AgencyStatus @default(ACTIVE)
-  plan            String       @default("standard")
+  plan            String       @default("standard") @db.Text
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
@@ -129,12 +131,12 @@ model AgencySetting {
   aitBase               AitBase        @default(TOTAL_FARE)
   commissionBase        CommissionBase @default(BASE_FARE)
   invoicePrefixes       Json           @default("{}")
-  invoiceTerms          String?
+  invoiceTerms          String?        @db.Text
   smsEnabled            Boolean        @default(false)
-  defaultMoneyAccountId String?
+  defaultMoneyAccountId String?        @db.Text
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @updatedAt
-  updatedById           String?
+  updatedById           String?        @db.Text
 
   agency Agency @relation(fields: [agencyId], references: [id])
 }
@@ -147,7 +149,7 @@ model Role {
   isSystem    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency Agency @relation(fields: [agencyId], references: [id])
   users  User[]
@@ -159,11 +161,11 @@ model Role {
 model User {
   id           String    @id @default(cuid())
   agencyId     String
-  name         String
+  name         String    @db.Text
   username     String
-  email        String?
-  phone        String?
-  passwordHash String
+  email        String?   @db.Text
+  phone        String?   @db.Text
+  passwordHash String    @db.Text
   roleId       String
   employeeId   String?
   isActive     Boolean   @default(true)
@@ -172,7 +174,7 @@ model User {
   lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-  createdById  String?
+  createdById  String?   @db.Text
 
   agency        Agency         @relation(fields: [agencyId], references: [id])
   role          Role           @relation(fields: [roleId], references: [id])
@@ -190,8 +192,8 @@ model LoginHistory {
   agencyId  String?
   userId    String?
   username  String
-  ip        String?
-  userAgent String?
+  ip        String?  @db.Text
+  userAgent String?  @db.Text
   success   Boolean
   at        DateTime @default(now())
 
@@ -205,14 +207,14 @@ model LoginHistory {
 model AuditLog {
   id        String   @id @default(cuid())
   agencyId  String
-  userId    String?
-  action    String // CREATE, UPDATE, ACTIVATE, DEACTIVATE, VOID, LOGIN, ...
+  userId    String?  @db.Text
+  action    String // CREATE, UPDATE, ACTIVATE, DEACTIVATE, VOID, LOGIN, ... @db.Text
   entity    String
   entityId  String?
   before    Json?
   after     Json?
-  ip        String?
-  userAgent String?
+  ip        String?  @db.Text
+  userAgent String?  @db.Text
   createdAt DateTime @default(now())
 
   agency Agency @relation(fields: [agencyId], references: [id])
@@ -228,12 +230,12 @@ model ClientCategory {
   id          String   @id @default(cuid())
   agencyId    String
   name        String
-  prefix      String?
-  note        String?
+  prefix      String?  @db.Text
+  note        String?  @db.Text
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency  Agency   @relation(fields: [agencyId], references: [id])
   clients Client[]
@@ -246,11 +248,11 @@ model Country {
   id          String   @id @default(cuid())
   agencyId    String
   name        String
-  iso2        String?
+  iso2        String?  @db.Text
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency Agency @relation(fields: [agencyId], references: [id])
 
@@ -262,13 +264,13 @@ model Airport {
   id          String   @id @default(cuid())
   agencyId    String
   iata        String
-  name        String
-  city        String?
-  country     String?
+  name        String   @db.Text
+  city        String?  @db.Text
+  country     String?  @db.Text
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency Agency @relation(fields: [agencyId], references: [id])
 
@@ -280,14 +282,14 @@ model Airline {
   id                String          @id @default(cuid())
   agencyId          String
   iata              String
-  name              String
+  name              String          @db.Text
   /// Overrides App Config commission base for this airline when set.
   commissionBase    CommissionBase?
   commissionPercent Decimal?        @db.Decimal(7, 4)
   isActive          Boolean         @default(true)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
-  createdById       String?
+  createdById       String?         @db.Text
 
   agency       Agency               @relation(fields: [agencyId], references: [id])
   reissueLines InvoiceReissueLine[]
@@ -316,7 +318,7 @@ model Product {
   isActive    Boolean     @default(true)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
-  createdById String?
+  createdById String?     @db.Text
 
   agency         Agency          @relation(fields: [agencyId], references: [id])
   quotationLines QuotationLine[]
@@ -333,7 +335,7 @@ model VisaType {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency    Agency            @relation(fields: [agencyId], references: [id])
   visaLines InvoiceVisaLine[]
@@ -349,7 +351,7 @@ model Department {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency    Agency     @relation(fields: [agencyId], references: [id])
   employees Employee[]
@@ -365,7 +367,7 @@ model Designation {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency    Agency     @relation(fields: [agencyId], references: [id])
   employees Employee[]
@@ -380,17 +382,17 @@ model Employee {
   name              String
   designationId     String?
   departmentId      String?
-  phone             String?
-  email             String?
-  address           String?
-  nid               String?
+  phone             String?   @db.Text
+  email             String?   @db.Text
+  address           String?   @db.Text
+  nid               String?   @db.Text
   salary            Decimal   @default(0) @db.Decimal(14, 2)
   commissionPercent Decimal   @default(0) @db.Decimal(7, 4)
   joinDate          DateTime?
   isActive          Boolean   @default(true)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-  createdById       String?
+  createdById       String?   @db.Text
 
   agency        Agency       @relation(fields: [agencyId], references: [id])
   payrolls      Payroll[]
@@ -410,7 +412,7 @@ model RoomType {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency       Agency        @relation(fields: [agencyId], references: [id])
   invoiceItems InvoiceItem[]
@@ -426,7 +428,7 @@ model TransportType {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency Agency @relation(fields: [agencyId], references: [id])
 
@@ -441,7 +443,7 @@ model PassportStatus {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency    Agency     @relation(fields: [agencyId], references: [id])
   passports Passport[]
@@ -463,12 +465,12 @@ model Group {
   name        String
   type        GroupType @default(HAJJ)
   year        Int?
-  leaderName  String?
-  note        String?
+  leaderName  String?   @db.Text
+  note        String?   @db.Text
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  createdById String?
+  createdById String?   @db.Text
 
   agency        Agency         @relation(fields: [agencyId], references: [id])
   pilgrims      Pilgrim[]
@@ -488,7 +490,7 @@ model Maharam {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency   Agency    @relation(fields: [agencyId], references: [id])
   pilgrims Pilgrim[]
@@ -502,14 +504,14 @@ model Company {
   id            String   @id @default(cuid())
   agencyId      String
   name          String
-  contactPerson String?
-  phone         String?
-  email         String?
-  address       String?
+  contactPerson String?  @db.Text
+  phone         String?  @db.Text
+  email         String?  @db.Text
+  address       String?  @db.Text
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  createdById   String?
+  createdById   String?  @db.Text
 
   agency  Agency   @relation(fields: [agencyId], references: [id])
   clients Client[]
@@ -526,11 +528,11 @@ model City {
   id          String   @id @default(cuid())
   agencyId    String
   name        String
-  country     String?
+  country     String?  @db.Text
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency         Agency          @relation(fields: [agencyId], references: [id])
   places         Place[]
@@ -543,15 +545,15 @@ model City {
 model Place {
   id          String   @id @default(cuid())
   agencyId    String
-  name        String
+  name        String   @db.Text
   cityId      String?
   cost        Decimal  @default(0) @db.Decimal(14, 2)
   vendorId    String?
-  note        String?
+  note        String?  @db.Text
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency Agency  @relation(fields: [agencyId], references: [id])
   vendor Vendor? @relation(fields: [vendorId], references: [id])
@@ -564,11 +566,11 @@ model TourGroup {
   id          String   @id @default(cuid())
   agencyId    String
   name        String
-  note        String?
+  note        String?  @db.Text
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency   Agency    @relation(fields: [agencyId], references: [id])
   invoices Invoice[]
@@ -580,14 +582,14 @@ model TourGroup {
 model TourTicket {
   id          String   @id @default(cuid())
   agencyId    String
-  name        String
+  name        String   @db.Text
   cost        Decimal  @default(0) @db.Decimal(14, 2)
   vendorId    String?
-  note        String?
+  note        String?  @db.Text
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency Agency  @relation(fields: [agencyId], references: [id])
   vendor Vendor? @relation(fields: [vendorId], references: [id])
@@ -598,15 +600,15 @@ model TourTicket {
 model Guide {
   id          String   @id @default(cuid())
   agencyId    String
-  name        String
-  phone       String?
+  name        String   @db.Text
+  phone       String?  @db.Text
   cost        Decimal  @default(0) @db.Decimal(14, 2)
   vendorId    String?
-  note        String?
+  note        String?  @db.Text
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency Agency  @relation(fields: [agencyId], references: [id])
   vendor Vendor? @relation(fields: [vendorId], references: [id])
@@ -617,14 +619,14 @@ model Guide {
 model Transport {
   id          String   @id @default(cuid())
   agencyId    String
-  name        String
+  name        String   @db.Text
   cost        Decimal  @default(0) @db.Decimal(14, 2)
   vendorId    String?
-  note        String?
+  note        String?  @db.Text
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency Agency  @relation(fields: [agencyId], references: [id])
   vendor Vendor? @relation(fields: [vendorId], references: [id])
@@ -635,14 +637,14 @@ model Transport {
 model Food {
   id          String   @id @default(cuid())
   agencyId    String
-  name        String
+  name        String   @db.Text
   cost        Decimal  @default(0) @db.Decimal(14, 2)
   vendorId    String?
-  note        String?
+  note        String?  @db.Text
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency Agency  @relation(fields: [agencyId], references: [id])
   vendor Vendor? @relation(fields: [vendorId], references: [id])
@@ -653,15 +655,15 @@ model Food {
 model Accommodation {
   id          String   @id @default(cuid())
   agencyId    String
-  name        String
+  name        String   @db.Text
   cityId      String?
   cost        Decimal  @default(0) @db.Decimal(14, 2)
   vendorId    String?
-  note        String?
+  note        String?  @db.Text
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency Agency  @relation(fields: [agencyId], references: [id])
   vendor Vendor? @relation(fields: [vendorId], references: [id])
@@ -673,14 +675,14 @@ model Accommodation {
 model OtherTransport {
   id          String   @id @default(cuid())
   agencyId    String
-  name        String
+  name        String   @db.Text
   cost        Decimal  @default(0) @db.Decimal(14, 2)
   vendorId    String?
-  note        String?
+  note        String?  @db.Text
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?
+  createdById String?  @db.Text
 
   agency Agency  @relation(fields: [agencyId], references: [id])
   vendor Vendor? @relation(fields: [vendorId], references: [id])
@@ -713,18 +715,18 @@ model Client {
   categoryId         String?
   companyId          String?
   phone              String?
-  email              String?
-  address            String?
+  email              String?            @db.Text
+  address            String?            @db.Text
   walkingCustomer    Boolean            @default(false)
   creditLimit        Decimal            @default(0) @db.Decimal(14, 2)
   openingBalance     Decimal            @default(0) @db.Decimal(14, 2)
   openingBalanceType OpeningBalanceType @default(RECEIVABLE)
   balance            Decimal            @default(0) @db.Decimal(14, 2)
-  note               String?
+  note               String?            @db.Text
   isActive           Boolean            @default(true)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
-  createdById        String?
+  createdById        String?            @db.Text
 
   agency     Agency           @relation(fields: [agencyId], references: [id])
   combined   CombinedClient[]
@@ -749,18 +751,18 @@ model CombinedClient {
   agencyId           String
   code               String
   name               String
-  contactPerson      String?
-  phone              String?
-  email              String?
-  address            String?
+  contactPerson      String?            @db.Text
+  phone              String?            @db.Text
+  email              String?            @db.Text
+  address            String?            @db.Text
   openingBalance     Decimal            @default(0) @db.Decimal(14, 2)
   openingBalanceType OpeningBalanceType @default(RECEIVABLE)
   balance            Decimal            @default(0) @db.Decimal(14, 2)
-  note               String?
+  note               String?            @db.Text
   isActive           Boolean            @default(true)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
-  createdById        String?
+  createdById        String?            @db.Text
   /// Sales to this party are invoiced to this client (receivable stays in AR).
   clientId           String?
   /// Purchases from this party are made from this vendor (payable stays in AP).
@@ -793,20 +795,20 @@ model Vendor {
   code               String
   name               String
   type               VendorType         @default(OTHER)
-  contactPerson      String?
-  phone              String?
-  email              String?
-  address            String?
-  bankInfo           String?
+  contactPerson      String?            @db.Text
+  phone              String?            @db.Text
+  email              String?            @db.Text
+  address            String?            @db.Text
+  bankInfo           String?            @db.Text
   commissionPercent  Decimal            @default(0) @db.Decimal(7, 4)
   openingBalance     Decimal            @default(0) @db.Decimal(14, 2)
   openingBalanceType OpeningBalanceType @default(PAYABLE)
   balance            Decimal            @default(0) @db.Decimal(14, 2)
-  note               String?
+  note               String?            @db.Text
   isActive           Boolean            @default(true)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
-  createdById        String?
+  createdById        String?            @db.Text
 
   agency          Agency               @relation(fields: [agencyId], references: [id])
   combined        CombinedClient[]
@@ -835,18 +837,18 @@ model Agent {
   agencyId           String
   code               String
   name               String
-  phone              String?
-  email              String?
-  address            String?
+  phone              String?            @db.Text
+  email              String?            @db.Text
+  address            String?            @db.Text
   commissionPercent  Decimal            @default(0) @db.Decimal(7, 4)
   openingBalance     Decimal            @default(0) @db.Decimal(14, 2)
   openingBalanceType OpeningBalanceType @default(PAYABLE)
   balance            Decimal            @default(0) @db.Decimal(14, 2)
-  note               String?
+  note               String?            @db.Text
   isActive           Boolean            @default(true)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
-  createdById        String?
+  createdById        String?            @db.Text
 
   agency   Agency    @relation(fields: [agencyId], references: [id])
   invoices Invoice[]
@@ -889,7 +891,7 @@ model LedgerAccount {
   id          String     @id @default(cuid())
   agencyId    String
   code        String
-  name        String
+  name        String     @db.Text
   type        LedgerType
   /// Stable key for system accounts (e.g. "AR", "SALES_AIR"); null for user accounts.
   systemKey   String?
@@ -898,7 +900,7 @@ model LedgerAccount {
   isActive    Boolean    @default(true)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
-  createdById String?
+  createdById String?    @db.Text
 
   agency       Agency          @relation(fields: [agencyId], references: [id])
   expenseHead  ExpenseHead?
@@ -925,19 +927,19 @@ model MoneyAccount {
   agencyId        String
   name            String
   kind            MoneyAccountKind @default(CASH)
-  bankName        String?
+  bankName        String?          @db.Text
   /// Stored masked, e.g. "••••4521". The full number is never kept.
-  accountNoMasked String?
-  branch          String?
+  accountNoMasked String?          @db.Text
+  branch          String?          @db.Text
   ledgerAccountId String           @unique
   openingBalance  Decimal          @default(0) @db.Decimal(14, 2)
   /// Cached ledger balance (debits - credits); maintained by the posting engine.
   balance         Decimal          @default(0) @db.Decimal(14, 2)
-  note            String?
+  note            String?          @db.Text
   isActive        Boolean          @default(true)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
-  createdById     String?
+  createdById     String?          @db.Text
 
   agency         Agency            @relation(fields: [agencyId], references: [id])
   vouchers       Voucher[]
@@ -975,12 +977,12 @@ model JournalEntry {
   date         DateTime @db.Date
   sourceType   String
   sourceId     String?
-  narration    String
+  narration    String   @db.Text
   isReversal   Boolean  @default(false)
   /// Set on a reversal entry: the entry it cancels (each entry can be reversed once).
   reversalOfId String?  @unique
   createdAt    DateTime @default(now())
-  createdById  String?
+  createdById  String?  @db.Text
 
   agency     Agency        @relation(fields: [agencyId], references: [id])
   lines      JournalLine[]
@@ -1003,7 +1005,7 @@ model JournalLine {
   partyType       PartyType?
   partyId         String?
   moneyAccountId  String?
-  memo            String?
+  memo            String?    @db.Text
   createdAt       DateTime   @default(now())
 
   agency        Agency        @relation(fields: [agencyId], references: [id])
@@ -1025,7 +1027,7 @@ model AccountingPeriod {
   month      Int
   isClosed   Boolean   @default(true)
   closedAt   DateTime?
-  closedById String?
+  closedById String?   @db.Text
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
@@ -1049,14 +1051,14 @@ model BalanceTransfer {
   amount        Decimal        @db.Decimal(14, 2)
   /// Bank / transfer fee paid from the source account (Transaction Charges expense).
   charge        Decimal        @default(0) @db.Decimal(14, 2)
-  note          String?
+  note          String?        @db.Text
   status        DocumentStatus @default(POSTED)
-  voidReason    String?
+  voidReason    String?        @db.Text
   voidedAt      DateTime?
-  voidedById    String?
+  voidedById    String?        @db.Text
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-  createdById   String?
+  createdById   String?        @db.Text
 
   agency      Agency       @relation(fields: [agencyId], references: [id])
   fromAccount MoneyAccount @relation("TransferFrom", fields: [fromAccountId], references: [id])
@@ -1121,22 +1123,22 @@ model Invoice {
   /// Cost taken back from vendors by live refunds (vendor amounts - vendor charges).
   refundCost      Decimal       @default(0) @db.Decimal(14, 2)
   status          InvoiceStatus @default(DRAFT)
-  note            String?
-  currency        String        @default("BDT")
+  note            String?       @db.Text
+  currency        String        @default("BDT") @db.Text
   exchangeRate    Decimal       @default(1) @db.Decimal(14, 6)
-  reissueOfId     String?
+  reissueOfId     String?       @db.Text
   /// Tour / Umrah / Hajj header details (optional).
   tourGroupId     String?
   groupId         String?
   travelDate      DateTime?     @db.Date
   returnDate      DateTime?     @db.Date
   postedAt        DateTime?
-  voidReason      String?
+  voidReason      String?       @db.Text
   voidedAt        DateTime?
-  voidedById      String?
+  voidedById      String?       @db.Text
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
-  createdById     String?
+  createdById     String?       @db.Text
 
   agency            Agency                   @relation(fields: [agencyId], references: [id])
   client            Client                   @relation(fields: [clientId], references: [id])
@@ -1173,20 +1175,20 @@ model InvoiceAirTicket {
   invoiceId         String
   sortOrder         Int           @default(0)
   ticketNo          String
-  pnr               String?
-  gdsPnr            String?
-  gds               String?
+  pnr               String?       @db.Text
+  gdsPnr            String?       @db.Text
+  gds               String?       @db.Text
   airlineId         String
   vendorId          String
-  passengerName     String
+  passengerName     String        @db.Text
   passengerType     PassengerType @default(ADT)
-  passportNo        String?
+  passportNo        String?       @db.Text
   /// Airport codes in travel order, e.g. "DAC-DXB-DAC".
-  route             String
+  route             String        @db.Text
   segmentCount      Int           @default(1)
   journeyDate       DateTime      @db.Date
   returnDate        DateTime?     @db.Date
-  cabinClass        String?
+  cabinClass        String?       @db.Text
   baseFare          Decimal       @db.Decimal(14, 2)
   /// [{ code, amount }] per tax code.
   taxes             Json          @default("[]")
@@ -1236,15 +1238,15 @@ model MoneyReceipt {
   paymentMethod     PaymentMethod  @default(CASH)
   /// Fee deducted by the bank / wallet (Transaction Charges expense).
   transactionCharge Decimal        @default(0) @db.Decimal(14, 2)
-  reference         String?
-  note              String?
+  reference         String?        @db.Text
+  note              String?        @db.Text
   status            DocumentStatus @default(POSTED)
-  voidReason        String?
+  voidReason        String?        @db.Text
   voidedAt          DateTime?
-  voidedById        String?
+  voidedById        String?        @db.Text
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
-  createdById       String?
+  createdById       String?        @db.Text
 
   agency       Agency                   @relation(fields: [agencyId], references: [id])
   cheque       Cheque?
@@ -1284,15 +1286,15 @@ model VendorPayment {
   moneyAccountId    String
   paymentMethod     PaymentMethod  @default(BANK)
   transactionCharge Decimal        @default(0) @db.Decimal(14, 2)
-  reference         String?
-  note              String?
+  reference         String?        @db.Text
+  note              String?        @db.Text
   status            DocumentStatus @default(POSTED)
-  voidReason        String?
+  voidReason        String?        @db.Text
   voidedAt          DateTime?
-  voidedById        String?
+  voidedById        String?        @db.Text
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
-  createdById       String?
+  createdById       String?        @db.Text
 
   agency       Agency       @relation(fields: [agencyId], references: [id])
   cheque       Cheque?
@@ -1315,14 +1317,14 @@ model AdvanceReturn {
   date           DateTime       @db.Date
   amount         Decimal        @db.Decimal(14, 2)
   moneyAccountId String
-  note           String?
+  note           String?        @db.Text
   status         DocumentStatus @default(POSTED)
-  voidReason     String?
+  voidReason     String?        @db.Text
   voidedAt       DateTime?
-  voidedById     String?
+  voidedById     String?        @db.Text
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
-  createdById    String?
+  createdById    String?        @db.Text
 
   agency       Agency       @relation(fields: [agencyId], references: [id])
   moneyAccount MoneyAccount @relation(fields: [moneyAccountId], references: [id])
@@ -1358,8 +1360,8 @@ model InvoiceItem {
   kind          ItemKind  @default(SERVICE)
   productId     String?
   /// Tour itinerary master the line was filled from (accommodation, guide, ...).
-  sourceId      String?
-  description   String
+  sourceId      String?   @db.Text
+  description   String    @db.Text
   qty           Decimal   @default(1) @db.Decimal(10, 2)
   unitPrice     Decimal   @default(0) @db.Decimal(14, 2)
   unitCost      Decimal   @default(0) @db.Decimal(14, 2)
@@ -1368,8 +1370,8 @@ model InvoiceItem {
   profit        Decimal   @default(0) @db.Decimal(14, 2)
   vendorId      String?
   /// Passenger details (Umrah / Hajj / package per person).
-  passengerName String?
-  passportNo    String?
+  passengerName String?   @db.Text
+  passportNo    String?   @db.Text
   groupId       String?
   roomTypeId    String?
   serviceDate   DateTime? @db.Date
@@ -1406,10 +1408,10 @@ model InvoiceVisaLine {
   agencyId        String
   invoiceId       String
   sortOrder       Int        @default(0)
-  country         String
+  country         String     @db.Text
   visaTypeId      String?
-  passengerName   String
-  passportNo      String?
+  passengerName   String     @db.Text
+  passportNo      String?    @db.Text
   vendorId        String
   clientPrice     Decimal    @db.Decimal(14, 2)
   purchasePrice   Decimal    @db.Decimal(14, 2)
@@ -1420,7 +1422,7 @@ model InvoiceVisaLine {
   statusHistory   Json       @default("[]")
   expectedDate    DateTime?  @db.Date
   deliveryDate    DateTime?  @db.Date
-  note            String?
+  note            String?    @db.Text
   createdAt       DateTime   @default(now())
 
   agency   Agency    @relation(fields: [agencyId], references: [id])
@@ -1444,10 +1446,10 @@ model InvoiceReissueLine {
   sortOrder        Int       @default(0)
   originalTicketId String
   /// New ticket number when the airline issues one.
-  ticketNo         String?
-  pnr              String?
-  passengerName    String
-  route            String
+  ticketNo         String?   @db.Text
+  pnr              String?   @db.Text
+  passengerName    String    @db.Text
+  route            String    @db.Text
   airlineId        String
   vendorId         String
   journeyDate      DateTime  @db.Date
@@ -1521,13 +1523,13 @@ model Refund {
   returnAmount       Decimal      @default(0) @db.Decimal(14, 2)
   moneyAccountId     String?
   status             RefundStatus @default(POSTED)
-  note               String?
-  voidReason         String?
+  note               String?      @db.Text
+  voidReason         String?      @db.Text
   voidedAt           DateTime?
-  voidedById         String?
+  voidedById         String?      @db.Text
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
-  createdById        String?
+  createdById        String?      @db.Text
 
   agency       Agency        @relation(fields: [agencyId], references: [id])
   invoice      Invoice       @relation(fields: [invoiceId], references: [id])
@@ -1549,7 +1551,7 @@ model RefundLine {
   lineKind     RefundLineKind
   /// Id of the refunded invoice line (ticket, reissue, item or visa line).
   lineId       String
-  description  String
+  description  String         @db.Text
   vendorId     String?
   clientAmount Decimal        @db.Decimal(14, 2)
   vendorAmount Decimal        @default(0) @db.Decimal(14, 2)
@@ -1583,37 +1585,37 @@ model Pilgrim {
   id              String        @id @default(cuid())
   agencyId        String
   clientId        String
-  name            String
+  name            String        @db.Text
   gender          Gender?
   dateOfBirth     DateTime?     @db.Date
-  passportNo      String?
+  passportNo      String?       @db.Text
   passportExpiry  DateTime?     @db.Date
-  nidNo           String?
-  phone           String?
-  address         String?
+  nidNo           String?       @db.Text
+  phone           String?       @db.Text
+  address         String?       @db.Text
   hajjYear        Int
   /// Government tracking number (from pre registration).
   trackingNo      String?
-  preRegNo        String?
+  preRegNo        String?       @db.Text
   preRegDate      DateTime?     @db.Date
-  regNo           String?
+  regNo           String?       @db.Text
   regDate         DateTime?     @db.Date
-  voucherNo       String?
+  voucherNo       String?       @db.Text
   groupId         String?
   /// Relation of the escort (Maharam master), and the escort's name.
   maharamId       String?
-  maharamName     String?
-  moallem         String?
+  maharamName     String?       @db.Text
+  moallem         String?       @db.Text
   status          PilgrimStatus @default(PRE_REGISTERED)
   /// Other agency for transfers in / out.
-  transferredFrom String?
-  transferredTo   String?
+  transferredFrom String?       @db.Text
+  transferredTo   String?       @db.Text
   cancelledDate   DateTime?     @db.Date
-  cancelReason    String?
-  note            String?
+  cancelReason    String?       @db.Text
+  note            String?       @db.Text
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
-  createdById     String?
+  createdById     String?       @db.Text
 
   agency        Agency             @relation(fields: [agencyId], references: [id])
   client        Client             @relation(fields: [clientId], references: [id])
@@ -1649,12 +1651,12 @@ model PilgrimEvent {
   pilgrimId   String
   type        PilgrimEventType
   date        DateTime         @db.Date
-  fromValue   String?
-  toValue     String?
-  note        String?
-  transferId  String?
+  fromValue   String?          @db.Text
+  toValue     String?          @db.Text
+  note        String?          @db.Text
+  transferId  String?          @db.Text
   createdAt   DateTime         @default(now())
-  createdById String?
+  createdById String?          @db.Text
 
   agency  Agency  @relation(fields: [agencyId], references: [id])
   pilgrim Pilgrim @relation(fields: [pilgrimId], references: [id])
@@ -1677,18 +1679,18 @@ model HajjTransfer {
   type             HajjTransferType
   date             DateTime         @db.Date
   /// New moallem, group name or the other agency.
-  toLabel          String
+  toLabel          String           @db.Text
   toGroupId        String?
   chargePerPilgrim Decimal          @default(0) @db.Decimal(14, 2)
   totalCharge      Decimal          @default(0) @db.Decimal(14, 2)
   status           DocumentStatus   @default(POSTED)
-  note             String?
-  voidReason       String?
+  note             String?          @db.Text
+  voidReason       String?          @db.Text
   voidedAt         DateTime?
-  voidedById       String?
+  voidedById       String?          @db.Text
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
-  createdById      String?
+  createdById      String?          @db.Text
 
   agency  Agency             @relation(fields: [agencyId], references: [id])
   toGroup Group?             @relation(fields: [toGroupId], references: [id])
@@ -1705,8 +1707,8 @@ model HajjTransferLine {
   agencyId   String
   transferId String
   pilgrimId  String
-  clientId   String
-  fromValue  String?
+  clientId   String         @db.Text
+  fromValue  String?        @db.Text
   fromStatus PilgrimStatus?
   charge     Decimal        @default(0) @db.Decimal(14, 2)
 
@@ -1726,11 +1728,11 @@ model ExpenseHead {
   agencyId        String
   name            String
   ledgerAccountId String   @unique
-  note            String?
+  note            String?  @db.Text
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  createdById     String?
+  createdById     String?  @db.Text
 
   agency        Agency        @relation(fields: [agencyId], references: [id])
   ledgerAccount LedgerAccount @relation(fields: [ledgerAccountId], references: [id])
@@ -1778,16 +1780,16 @@ model Voucher {
   /// Investment return: the investment it returns.
   investmentId   String?
   /// Investment: its name (e.g. "FDR City Bank").
-  title          String?
-  reference      String?
-  note           String?
+  title          String?          @db.Text
+  reference      String?          @db.Text
+  note           String?          @db.Text
   status         DocumentStatus   @default(POSTED)
-  voidReason     String?
+  voidReason     String?          @db.Text
   voidedAt       DateTime?
-  voidedById     String?
+  voidedById     String?          @db.Text
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
-  createdById    String?
+  createdById    String?          @db.Text
 
   agency       Agency              @relation(fields: [agencyId], references: [id])
   moneyAccount MoneyAccount?       @relation(fields: [moneyAccountId], references: [id])
@@ -1810,12 +1812,12 @@ model Attachment {
   agencyId    String
   voucherId   String?
   passportId  String?
-  fileName    String
-  mimeType    String
+  fileName    String   @db.Text
+  mimeType    String   @db.Text
   size        Int
   data        Bytes
   createdAt   DateTime @default(now())
-  createdById String?
+  createdById String?  @db.Text
 
   agency   Agency    @relation(fields: [agencyId], references: [id])
   voucher  Voucher?  @relation(fields: [voucherId], references: [id])
@@ -1838,14 +1840,14 @@ model LoanAuthority {
   agencyId    String
   name        String
   type        LoanAuthorityType @default(BANK)
-  phone       String?
-  address     String?
-  note        String?
+  phone       String?           @db.Text
+  address     String?           @db.Text
+  note        String?           @db.Text
   balance     Decimal           @default(0) @db.Decimal(14, 2)
   isActive    Boolean           @default(true)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
-  createdById String?
+  createdById String?           @db.Text
 
   agency Agency @relation(fields: [agencyId], references: [id])
   loans  Loan[]
@@ -1880,14 +1882,14 @@ model Loan {
   moneyAccountId String
   /// Principal repaid by live payments (cached).
   repaid         Decimal    @default(0) @db.Decimal(14, 2)
-  note           String?
+  note           String?    @db.Text
   status         LoanStatus @default(ACTIVE)
-  voidReason     String?
+  voidReason     String?    @db.Text
   voidedAt       DateTime?
-  voidedById     String?
+  voidedById     String?    @db.Text
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
-  createdById    String?
+  createdById    String?    @db.Text
 
   agency       Agency        @relation(fields: [agencyId], references: [id])
   authority    LoanAuthority @relation(fields: [authorityId], references: [id])
@@ -1909,14 +1911,14 @@ model LoanPayment {
   principal      Decimal        @default(0) @db.Decimal(14, 2)
   interest       Decimal        @default(0) @db.Decimal(14, 2)
   moneyAccountId String
-  note           String?
+  note           String?        @db.Text
   status         DocumentStatus @default(POSTED)
-  voidReason     String?
+  voidReason     String?        @db.Text
   voidedAt       DateTime?
-  voidedById     String?
+  voidedById     String?        @db.Text
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
-  createdById    String?
+  createdById    String?        @db.Text
 
   agency       Agency       @relation(fields: [agencyId], references: [id])
   loan         Loan         @relation(fields: [loanId], references: [id])
@@ -1945,14 +1947,14 @@ model Payroll {
   advanceAdjusted Decimal        @default(0) @db.Decimal(14, 2)
   netPaid         Decimal        @db.Decimal(14, 2)
   moneyAccountId  String
-  note            String?
+  note            String?        @db.Text
   status          DocumentStatus @default(POSTED)
-  voidReason      String?
+  voidReason      String?        @db.Text
   voidedAt        DateTime?
-  voidedById      String?
+  voidedById      String?        @db.Text
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
-  createdById     String?
+  createdById     String?        @db.Text
 
   agency       Agency       @relation(fields: [agencyId], references: [id])
   employee     Employee     @relation(fields: [employeeId], references: [id])
@@ -1981,13 +1983,13 @@ model Cheque {
   id              String          @id @default(cuid())
   agencyId        String
   direction       ChequeDirection
-  chequeNo        String
-  bankName        String
+  chequeNo        String          @db.Text
+  bankName        String          @db.Text
   chequeDate      DateTime        @db.Date
   amount          Decimal         @db.Decimal(14, 2)
   status          ChequeStatus    @default(PENDING)
   partyType       PartyType
-  partyId         String
+  partyId         String          @db.Text
   receiptId       String?         @unique
   vendorPaymentId String?         @unique
   /// Our bank account it goes into (received) or is drawn on (issued).
@@ -1997,10 +1999,10 @@ model Cheque {
   bouncedDate     DateTime?       @db.Date
   /// [{ status, at, by, note }]
   history         Json            @default("[]")
-  note            String?
+  note            String?         @db.Text
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
-  createdById     String?
+  createdById     String?         @db.Text
 
   agency        Agency         @relation(fields: [agencyId], references: [id])
   receipt       MoneyReceipt?  @relation(fields: [receiptId], references: [id])
@@ -2018,26 +2020,26 @@ model Passport {
   id            String    @id @default(cuid())
   agencyId      String
   passportNo    String
-  name          String
+  name          String    @db.Text
   clientId      String?
   gender        Gender?
   dateOfBirth   DateTime? @db.Date
-  nationality   String    @default("Bangladeshi")
-  placeOfIssue  String?
+  nationality   String    @default("Bangladeshi") @db.Text
+  placeOfIssue  String?   @db.Text
   issueDate     DateTime? @db.Date
   expiryDate    DateTime  @db.Date
-  phone         String?
+  phone         String?   @db.Text
   statusId      String?
   /// [{ status, at, by, note }]
   statusHistory Json      @default("[]")
   /// Passport physically with the agency since / handed back on.
   receivedDate  DateTime? @db.Date
   returnedDate  DateTime? @db.Date
-  note          String?
+  note          String?   @db.Text
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  createdById   String?
+  createdById   String?   @db.Text
 
   agency      Agency          @relation(fields: [agencyId], references: [id])
   client      Client?         @relation(fields: [clientId], references: [id])
@@ -2065,19 +2067,19 @@ model Quotation {
   clientId           String
   date               DateTime        @db.Date
   validUntil         DateTime        @db.Date
-  subject            String?
+  subject            String?         @db.Text
   /// Invoice type it becomes when converted (a line based type).
   invoiceType        InvoiceType     @default(OTHER)
   subtotal           Decimal         @default(0) @db.Decimal(14, 2)
   discount           Decimal         @default(0) @db.Decimal(14, 2)
   netTotal           Decimal         @default(0) @db.Decimal(14, 2)
-  note               String?
-  terms              String?
+  note               String?         @db.Text
+  terms              String?         @db.Text
   status             QuotationStatus @default(DRAFT)
   convertedInvoiceId String?         @unique
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
-  createdById        String?
+  createdById        String?         @db.Text
 
   agency           Agency          @relation(fields: [agencyId], references: [id])
   client           Client          @relation(fields: [clientId], references: [id])
@@ -2095,7 +2097,7 @@ model QuotationLine {
   agencyId    String
   quotationId String
   sortOrder   Int     @default(0)
-  description String
+  description String  @db.Text
   qty         Decimal @default(1) @db.Decimal(10, 2)
   unitPrice   Decimal @default(0) @db.Decimal(14, 2)
   amount      Decimal @default(0) @db.Decimal(14, 2)
@@ -2124,17 +2126,17 @@ enum SmsStatus {
 model SmsLog {
   id          String    @id @default(cuid())
   agencyId    String
-  to          String
-  message     String
+  to          String    @db.Text
+  message     String    @db.Text
   /// What triggered it: MANUAL, VISA_APPROVED, VISA_DELIVERED, PASSPORT_EXPIRY, ...
-  event       String
+  event       String    @db.Text
   status      SmsStatus
-  providerRef String?
-  error       String?
+  providerRef String?   @db.Text
+  error       String?   @db.Text
   relatedType String?
   relatedId   String?
   createdAt   DateTime  @default(now())
-  createdById String?
+  createdById String?   @db.Text
 
   agency Agency @relation(fields: [agencyId], references: [id])
 
@@ -2147,10 +2149,10 @@ model Notification {
   id        String    @id @default(cuid())
   agencyId  String
   userId    String
-  kind      String
-  title     String
-  body      String?
-  link      String?
+  kind      String    @db.Text
+  title     String    @db.Text
+  body      String?   @db.Text
+  link      String?   @db.Text
   readAt    DateTime?
   createdAt DateTime  @default(now())
 
@@ -2178,10 +2180,10 @@ model Feedback {
   agencyId   String
   userId     String?
   kind       FeedbackKind   @default(IDEA)
-  message    String
-  page       String?
+  message    String         @db.Text
+  page       String?        @db.Text
   status     FeedbackStatus @default(OPEN)
-  reply      String?
+  reply      String?        @db.Text
   resolvedAt DateTime?
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
@@ -2199,7 +2201,7 @@ model ImpersonationToken {
   id           String    @id @default(cuid())
   tokenHash    String    @unique
   adminUserId  String
-  targetUserId String
+  targetUserId String    @db.Text
   expiresAt    DateTime
   usedAt       DateTime?
   createdAt    DateTime  @default(now())

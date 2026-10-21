@@ -1,14 +1,14 @@
-# Optional: local Postgres via Docker (the dev machine uses a native PostgreSQL 16 install).
+# Optional: local MariaDB via Docker (the dev machine uses a native MariaDB 10.11 service on 3307).
 services:
   db:
-    image: postgres:16
+    image: mariadb:10.11
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: scaleb_insider
+      MARIADB_ROOT_PASSWORD: devroot
+      MARIADB_DATABASE: scaleb_insider
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
     ports:
-      - "5432:5432"
+      - "3307:3306"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - dbdata:/var/lib/mysql
 volumes:
-  pgdata:
+  dbdata:

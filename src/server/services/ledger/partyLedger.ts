@@ -53,19 +53,18 @@ export async function partyLedger(ctx: ServiceContext, q: LedgerQuery): Promise<
       : [{ partyType: q.partyType, partyId: q.partyId }];
   const partyFilter = Prisma.join(
     parties.map(
-      (p) =>
-        Prisma.sql`(jl."partyType" = ${p.partyType}::"PartyType" AND jl."partyId" = ${p.partyId})`,
+      (p) => Prisma.sql`(jl.\`partyType\` = ${p.partyType} AND jl.\`partyId\` = ${p.partyId})`,
     ),
     " OR ",
   );
   const base = Prisma.sql`
     WITH l AS (
-      SELECT jl.id, jl."partyType" AS side, je.date, je.number, je."sourceType", je."sourceId", je.narration, jl.memo,
-             jl.debit, jl.credit, je."createdAt",
-             SUM(jl.debit - jl.credit) OVER (ORDER BY je.date, je."createdAt", jl.id) AS running
-      FROM "JournalLine" jl
-      JOIN "JournalEntry" je ON je.id = jl."entryId"
-      WHERE jl."agencyId" = ${ctx.agencyId}
+      SELECT jl.id, jl.\`partyType\` AS side, je.date, je.number, je.\`sourceType\`, je.\`sourceId\`, je.narration, jl.memo,
+             jl.debit, jl.credit, je.\`createdAt\`,
+             SUM(jl.debit - jl.credit) OVER (ORDER BY je.date, je.\`createdAt\`, jl.id) AS running
+      FROM \`JournalLine\` jl
+      JOIN \`JournalEntry\` je ON je.id = jl.\`entryId\`
+      WHERE jl.\`agencyId\` = ${ctx.agencyId}
         AND (${partyFilter})
     )`;
   const filters: Prisma.Sql[] = [];
@@ -89,7 +88,7 @@ export async function partyLedger(ctx: ServiceContext, q: LedgerQuery): Promise<
   const [rows, [agg], [openingRow]] = await Promise.all([
     db.$queryRaw<Raw[]>`${base}
       SELECT * FROM l ${where}
-      ORDER BY date, "createdAt", id
+      ORDER BY date, \`createdAt\`, id
       LIMIT ${q.pageSize} OFFSET ${(q.page - 1) * q.pageSize}`,
     db.$queryRaw<
       {
@@ -100,12 +99,12 @@ export async function partyLedger(ctx: ServiceContext, q: LedgerQuery): Promise<
       }[]
     >`${base}
       SELECT COUNT(*) AS n, SUM(debit) AS debit, SUM(credit) AS credit,
-             (SELECT running FROM l ${where} ORDER BY date DESC, "createdAt" DESC, id DESC LIMIT 1) AS last
+             (SELECT running FROM l ${where} ORDER BY date DESC, \`createdAt\` DESC, id DESC LIMIT 1) AS last
       FROM l ${where}`,
     q.from
       ? db.$queryRaw<{ v: Prisma.Decimal | null }[]>`${base}
           SELECT (SELECT running FROM l WHERE date < ${sqlDate(q.from)}
-                  ORDER BY date DESC, "createdAt" DESC, id DESC LIMIT 1) AS v`
+                  ORDER BY date DESC, \`createdAt\` DESC, id DESC LIMIT 1) AS v`
       : Promise.resolve([{ v: null }]),
   ]);
 

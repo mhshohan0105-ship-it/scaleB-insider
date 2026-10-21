@@ -82,7 +82,7 @@ export function invoiceDue(inv: {
 
 /** Locks an invoice row for the rest of the transaction. */
 export async function lockInvoice(tx: TenantTx, agencyId: string, id: string) {
-  await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${id} AND "agencyId" = ${agencyId} FOR UPDATE`;
+  await tx.$queryRaw`SELECT id FROM \`Invoice\` WHERE id = ${id} AND \`agencyId\` = ${agencyId} FOR UPDATE`;
 }
 
 /**
@@ -182,16 +182,16 @@ export async function listInvoices(
   const q = query.q?.trim();
   if (q) {
     where.OR = [
-      { number: { contains: q, mode: "insensitive" } },
-      { client: { name: { contains: q, mode: "insensitive" } } },
-      { client: { code: { contains: q, mode: "insensitive" } } },
-      { airTickets: { some: { ticketNo: { contains: q, mode: "insensitive" } } } },
-      { airTickets: { some: { pnr: { contains: q, mode: "insensitive" } } } },
-      { airTickets: { some: { passengerName: { contains: q, mode: "insensitive" } } } },
-      { reissueLines: { some: { ticketNo: { contains: q, mode: "insensitive" } } } },
-      { reissueLines: { some: { passengerName: { contains: q, mode: "insensitive" } } } },
-      { items: { some: { passengerName: { contains: q, mode: "insensitive" } } } },
-      { visaLines: { some: { passengerName: { contains: q, mode: "insensitive" } } } },
+      { number: { contains: q } },
+      { client: { name: { contains: q } } },
+      { client: { code: { contains: q } } },
+      { airTickets: { some: { ticketNo: { contains: q } } } },
+      { airTickets: { some: { pnr: { contains: q } } } },
+      { airTickets: { some: { passengerName: { contains: q } } } },
+      { reissueLines: { some: { ticketNo: { contains: q } } } },
+      { reissueLines: { some: { passengerName: { contains: q } } } },
+      { items: { some: { passengerName: { contains: q } } } },
+      { visaLines: { some: { passengerName: { contains: q } } } },
     ];
   }
   const liveWhere: Prisma.InvoiceWhereInput = {
@@ -269,31 +269,31 @@ export async function listVendorPurchases(
   params: { page: number; pageSize: number; from?: string; to?: string },
 ): Promise<{ rows: VendorPurchaseRow[]; total: number; totalCost: string }> {
   const db = tenantDb(ctx.agencyId);
-  const filters = [Prisma.sql`i.status::text NOT IN ('DRAFT', 'VOID')`];
+  const filters = [Prisma.sql`i.status NOT IN ('DRAFT', 'VOID')`];
   if (params.from) filters.push(Prisma.sql`i.date >= ${sqlDate(params.from)}`);
   if (params.to) filters.push(Prisma.sql`i.date <= ${sqlDate(params.to)}`);
   const where = Prisma.join(filters, " AND ");
   const base = Prisma.sql`
     WITH p AS (
-      SELECT t.id, i.id AS "invoiceId", i.number, i.type::text AS type, i.date, i."createdAt",
-             t."ticketNo" || ' · ' || t."passengerName" AS description, t.route AS detail, t."purchasePrice" AS cost
-      FROM "InvoiceAirTicket" t JOIN "Invoice" i ON i.id = t."invoiceId"
-      WHERE t."agencyId" = ${ctx.agencyId} AND t."vendorId" = ${vendorId} AND ${where}
+      SELECT t.id, i.id AS \`invoiceId\`, i.number, i.type AS type, i.date, i.\`createdAt\`,
+             CONCAT(t.\`ticketNo\`, ' · ', t.\`passengerName\`) AS description, t.route AS detail, t.\`purchasePrice\` AS cost
+      FROM \`InvoiceAirTicket\` t JOIN \`Invoice\` i ON i.id = t.\`invoiceId\`
+      WHERE t.\`agencyId\` = ${ctx.agencyId} AND t.\`vendorId\` = ${vendorId} AND ${where}
       UNION ALL
-      SELECT it.id, i.id, i.number, i.type::text, i.date, i."createdAt",
-             it.description, it."passengerName", it."purchasePrice"
-      FROM "InvoiceItem" it JOIN "Invoice" i ON i.id = it."invoiceId"
-      WHERE it."agencyId" = ${ctx.agencyId} AND it."vendorId" = ${vendorId} AND it."purchasePrice" > 0 AND ${where}
+      SELECT it.id, i.id, i.number, i.type, i.date, i.\`createdAt\`,
+             it.description, it.\`passengerName\`, it.\`purchasePrice\`
+      FROM \`InvoiceItem\` it JOIN \`Invoice\` i ON i.id = it.\`invoiceId\`
+      WHERE it.\`agencyId\` = ${ctx.agencyId} AND it.\`vendorId\` = ${vendorId} AND it.\`purchasePrice\` > 0 AND ${where}
       UNION ALL
-      SELECT v.id, i.id, i.number, i.type::text, i.date, i."createdAt",
-             v.country || ' visa · ' || v."passengerName", v."passportNo", v."purchasePrice"
-      FROM "InvoiceVisaLine" v JOIN "Invoice" i ON i.id = v."invoiceId"
-      WHERE v."agencyId" = ${ctx.agencyId} AND v."vendorId" = ${vendorId} AND v."purchasePrice" > 0 AND ${where}
+      SELECT v.id, i.id, i.number, i.type, i.date, i.\`createdAt\`,
+             CONCAT(v.country, ' visa · ', v.\`passengerName\`), v.\`passportNo\`, v.\`purchasePrice\`
+      FROM \`InvoiceVisaLine\` v JOIN \`Invoice\` i ON i.id = v.\`invoiceId\`
+      WHERE v.\`agencyId\` = ${ctx.agencyId} AND v.\`vendorId\` = ${vendorId} AND v.\`purchasePrice\` > 0 AND ${where}
       UNION ALL
-      SELECT r.id, i.id, i.number, i.type::text, i.date, i."createdAt",
-             'Reissue · ' || r."passengerName", r.route, r."purchasePrice"
-      FROM "InvoiceReissueLine" r JOIN "Invoice" i ON i.id = r."invoiceId"
-      WHERE r."agencyId" = ${ctx.agencyId} AND r."vendorId" = ${vendorId} AND r."purchasePrice" > 0 AND ${where}
+      SELECT r.id, i.id, i.number, i.type, i.date, i.\`createdAt\`,
+             CONCAT('Reissue · ', r.\`passengerName\`), r.route, r.\`purchasePrice\`
+      FROM \`InvoiceReissueLine\` r JOIN \`Invoice\` i ON i.id = r.\`invoiceId\`
+      WHERE r.\`agencyId\` = ${ctx.agencyId} AND r.\`vendorId\` = ${vendorId} AND r.\`purchasePrice\` > 0 AND ${where}
     )`;
   type Raw = {
     id: string;
@@ -307,7 +307,7 @@ export async function listVendorPurchases(
   };
   const [rows, [agg]] = await Promise.all([
     db.$queryRaw<Raw[]>`${base}
-      SELECT * FROM p ORDER BY date DESC, "createdAt" DESC, id
+      SELECT * FROM p ORDER BY date DESC, \`createdAt\` DESC, id
       LIMIT ${params.pageSize} OFFSET ${(params.page - 1) * params.pageSize}`,
     db.$queryRaw<{ n: bigint; cost: Prisma.Decimal | null }[]>`${base}
       SELECT COUNT(*) AS n, SUM(cost) AS cost FROM p`,

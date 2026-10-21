@@ -13,6 +13,7 @@ import { saveExpenseHead } from "../src/server/services/expense/expenseHeadServi
 import { createPilgrim } from "../src/server/services/hajj/pilgrimService";
 import { savePassport } from "../src/server/services/passports/passportService";
 import { saveMaster } from "../src/server/services/masters/masterService";
+import { createAirInvoice } from "../src/server/services/invoices/airInvoiceService";
 import { linkCombinedAccounts } from "../src/server/services/parties/combinedService";
 import { tenantDb } from "../src/server/db/tenant";
 
@@ -141,6 +142,42 @@ async function main() {
   for (const c of unlinked)
     await tenantDb(agency.id).$transaction((tx) => linkCombinedAccounts(tx, ctx, c.id));
   if (unlinked.length) console.log(`Linked ${unlinked.length} combined client(s).`);
+
+  // One posted air ticket invoice, so the reports and ledgers have an example.
+  if ((await prisma.invoice.count({ where: { agencyId: agency.id, type: "AIR" } })) === 0) {
+    const [client, vendor, airline] = await Promise.all([
+      prisma.client.findFirst({ where: { agencyId: agency.id, name: "Abdul Karim" } }),
+      prisma.vendor.findFirst({
+        where: { agencyId: agency.id, name: "Skyline Air Consolidators" },
+      }),
+      prisma.airline.findFirst({ where: { agencyId: agency.id, iata: "BG" } }),
+    ]);
+    if (client && vendor && airline) {
+      const today = new Date().toISOString().slice(0, 10);
+      const { number } = await createAirInvoice(ctx, {
+        clientId: client.id,
+        date: today,
+        post: true,
+        tickets: [
+          {
+            ticketNo: "9970000000001",
+            pnr: "DEMO01",
+            airlineId: airline.id,
+            vendorId: vendor.id,
+            passengerName: "ABDUL KARIM",
+            passengerType: "ADT",
+            route: "DAC-DXB-DAC",
+            journeyDate: today,
+            baseFare: "40000",
+            taxes: [{ code: "BD", amount: "10000" }],
+            commissionPercent: "7",
+            clientPrice: "49500",
+          },
+        ],
+      });
+      console.log(`Created demo air ticket invoice ${number}.`);
+    }
+  }
 
   // Parties created before the accounting engine existed get their opening entries.
   const backfilled = await backfillOpeningEntries(ctx);

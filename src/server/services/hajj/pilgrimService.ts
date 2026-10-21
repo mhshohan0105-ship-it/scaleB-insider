@@ -19,7 +19,7 @@ const iso = (v: Date | null) => (v ? dateToIso(v) : null);
 export async function lockPilgrims(tx: TenantTx, agencyId: string, ids: string[]) {
   if (!ids.length) return [];
   await tx.$queryRaw`
-    SELECT id FROM "Pilgrim" WHERE id IN (${Prisma.join([...ids].sort())}) AND "agencyId" = ${agencyId}
+    SELECT id FROM \`Pilgrim\` WHERE id IN (${Prisma.join([...ids].sort())}) AND \`agencyId\` = ${agencyId}
     ORDER BY id FOR UPDATE`;
   return tx.pilgrim.findMany({ where: { id: { in: ids } } });
 }
@@ -324,12 +324,12 @@ export async function listPilgrims(ctx: ServiceContext, q: PilgrimListQuery) {
   const text = q.q?.trim();
   if (text) {
     where.OR = [
-      { name: { contains: text, mode: "insensitive" } },
-      { passportNo: { contains: text, mode: "insensitive" } },
-      { trackingNo: { contains: text, mode: "insensitive" } },
-      { regNo: { contains: text, mode: "insensitive" } },
+      { name: { contains: text } },
+      { passportNo: { contains: text } },
+      { trackingNo: { contains: text } },
+      { regNo: { contains: text } },
       { phone: { contains: text } },
-      { client: { name: { contains: text, mode: "insensitive" } } },
+      { client: { name: { contains: text } } },
     ];
   }
   const [rows, total, counts] = await Promise.all([

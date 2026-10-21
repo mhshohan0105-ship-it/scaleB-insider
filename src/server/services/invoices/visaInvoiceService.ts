@@ -319,11 +319,11 @@ export async function visaBoard(ctx: ServiceContext, q?: string): Promise<VisaBo
             AND: [
               {
                 OR: [
-                  { passengerName: { contains: term, mode: "insensitive" } },
-                  { passportNo: { contains: term, mode: "insensitive" } },
-                  { country: { contains: term, mode: "insensitive" } },
-                  { invoice: { number: { contains: term, mode: "insensitive" } } },
-                  { invoice: { client: { name: { contains: term, mode: "insensitive" } } } },
+                  { passengerName: { contains: term } },
+                  { passportNo: { contains: term } },
+                  { country: { contains: term } },
+                  { invoice: { number: { contains: term } } },
+                  { invoice: { client: { name: { contains: term } } } },
                 ],
               },
             ],

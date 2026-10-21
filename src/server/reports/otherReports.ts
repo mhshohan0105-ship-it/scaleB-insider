@@ -37,7 +37,9 @@ async function summary(
 ): Promise<ReportResult> {
   const a = ctx.agencyId;
   const bucket = (col: Prisma.Sql) =>
-    monthly ? Prisma.sql`to_char(${col}, 'YYYY-MM')` : Prisma.sql`to_char(${col}, 'YYYY-MM-DD')`;
+    monthly
+      ? Prisma.sql`DATE_FORMAT(${col}, '%Y-%m')`
+      : Prisma.sql`DATE_FORMAT(${col}, '%Y-%m-%d')`;
   const rows = await tenantDb(a).$queryRaw<
     {
       b: string;
@@ -51,24 +53,24 @@ async function summary(
     }[]
   >`
     WITH m AS (
-      SELECT ${bucket(Prisma.sql`date`)} AS b, "netTotal" - "refundCredit" AS sales, "totalCost" - "refundCost" AS cost,
-             0::numeric AS collected, 0::numeric AS paid, 0::numeric AS expenses, 0::numeric AS salaries, 0::numeric AS refunds
-      FROM "Invoice" WHERE "agencyId" = ${a} AND status::text IN ${LIVE} ${period(Prisma.sql`date`, p)}
+      SELECT ${bucket(Prisma.sql`date`)} AS b, \`netTotal\` - \`refundCredit\` AS sales, \`totalCost\` - \`refundCost\` AS cost,
+             CAST(0 AS DECIMAL(14,2)) AS collected, CAST(0 AS DECIMAL(14,2)) AS paid, CAST(0 AS DECIMAL(14,2)) AS expenses, CAST(0 AS DECIMAL(14,2)) AS salaries, CAST(0 AS DECIMAL(14,2)) AS refunds
+      FROM \`Invoice\` WHERE \`agencyId\` = ${a} AND status IN ${LIVE} ${period(Prisma.sql`date`, p)}
       UNION ALL
-      SELECT ${bucket(Prisma.sql`date`)}, 0, 0, amount, 0, 0, 0, 0 FROM "MoneyReceipt"
-      WHERE "agencyId" = ${a} AND status = 'POSTED' ${period(Prisma.sql`date`, p)}
+      SELECT ${bucket(Prisma.sql`date`)}, 0, 0, amount, 0, 0, 0, 0 FROM \`MoneyReceipt\`
+      WHERE \`agencyId\` = ${a} AND status = 'POSTED' ${period(Prisma.sql`date`, p)}
       UNION ALL
-      SELECT ${bucket(Prisma.sql`date`)}, 0, 0, 0, amount, 0, 0, 0 FROM "VendorPayment"
-      WHERE "agencyId" = ${a} AND status = 'POSTED' ${period(Prisma.sql`date`, p)}
+      SELECT ${bucket(Prisma.sql`date`)}, 0, 0, 0, amount, 0, 0, 0 FROM \`VendorPayment\`
+      WHERE \`agencyId\` = ${a} AND status = 'POSTED' ${period(Prisma.sql`date`, p)}
       UNION ALL
-      SELECT ${bucket(Prisma.sql`date`)}, 0, 0, 0, 0, amount, 0, 0 FROM "Voucher"
-      WHERE "agencyId" = ${a} AND kind = 'EXPENSE' AND status = 'POSTED' ${period(Prisma.sql`date`, p)}
+      SELECT ${bucket(Prisma.sql`date`)}, 0, 0, 0, 0, amount, 0, 0 FROM \`Voucher\`
+      WHERE \`agencyId\` = ${a} AND kind = 'EXPENSE' AND status = 'POSTED' ${period(Prisma.sql`date`, p)}
       UNION ALL
-      SELECT ${bucket(Prisma.sql`date`)}, 0, 0, 0, 0, 0, basic + "allowanceTotal" - "deductionTotal", 0 FROM "Payroll"
-      WHERE "agencyId" = ${a} AND status = 'POSTED' ${period(Prisma.sql`date`, p)}
+      SELECT ${bucket(Prisma.sql`date`)}, 0, 0, 0, 0, 0, basic + \`allowanceTotal\` - \`deductionTotal\`, 0 FROM \`Payroll\`
+      WHERE \`agencyId\` = ${a} AND status = 'POSTED' ${period(Prisma.sql`date`, p)}
       UNION ALL
-      SELECT ${bucket(Prisma.sql`date`)}, 0, 0, 0, 0, 0, 0, "clientRefundAmount" - "clientCharge" FROM "Refund"
-      WHERE "agencyId" = ${a} AND status = 'POSTED' ${period(Prisma.sql`date`, p)}
+      SELECT ${bucket(Prisma.sql`date`)}, 0, 0, 0, 0, 0, 0, \`clientRefundAmount\` - \`clientCharge\` FROM \`Refund\`
+      WHERE \`agencyId\` = ${a} AND status = 'POSTED' ${period(Prisma.sql`date`, p)}
     )
     SELECT b, SUM(sales) AS sales, SUM(cost) AS cost, SUM(collected) AS collected, SUM(paid) AS paid,
            SUM(expenses) AS expenses, SUM(salaries) AS salaries, SUM(refunds) AS refunds
@@ -138,14 +140,14 @@ export async function accountsSummary(ctx: ServiceContext, p: ReportParams): Pro
   const rows = await tenantDb(a).$queryRaw<
     { id: string; name: string; kind: string; opening: Dec; moneyIn: Dec; moneyOut: Dec }[]
   >`
-    SELECT ma.id, ma.name, ma.kind::text AS kind,
-           COALESCE(SUM(jl.debit - jl.credit) FILTER (WHERE ${before}), 0) AS opening,
-           COALESCE(SUM(jl.debit) FILTER (WHERE ${inRange}), 0) AS "moneyIn",
-           COALESCE(SUM(jl.credit) FILTER (WHERE ${inRange}), 0) AS "moneyOut"
-    FROM "MoneyAccount" ma
-    LEFT JOIN "JournalLine" jl ON jl."moneyAccountId" = ma.id
-    LEFT JOIN "JournalEntry" je ON je.id = jl."entryId" AND (${p.to ? Prisma.sql`je.date <= ${sqlDate(p.to)}` : Prisma.sql`TRUE`})
-    WHERE ma."agencyId" = ${a}
+    SELECT ma.id, ma.name, ma.kind AS kind,
+           COALESCE(SUM(CASE WHEN ${before} THEN jl.debit - jl.credit END), 0) AS opening,
+           COALESCE(SUM(CASE WHEN ${inRange} THEN jl.debit END), 0) AS \`moneyIn\`,
+           COALESCE(SUM(CASE WHEN ${inRange} THEN jl.credit END), 0) AS \`moneyOut\`
+    FROM \`MoneyAccount\` ma
+    LEFT JOIN \`JournalLine\` jl ON jl.\`moneyAccountId\` = ma.id
+    LEFT JOIN \`JournalEntry\` je ON je.id = jl.\`entryId\` AND (${p.to ? Prisma.sql`je.date <= ${sqlDate(p.to)}` : Prisma.sql`TRUE`})
+    WHERE ma.\`agencyId\` = ${a}
     GROUP BY ma.id, ma.name, ma.kind ORDER BY ma.name`;
   const out = rows.map((r) => ({
     account: r.name,
@@ -180,7 +182,7 @@ export async function clientDiscount(
   all = false,
 ): Promise<ReportResult> {
   const a = ctx.agencyId;
-  const where = Prisma.sql`i."agencyId" = ${a} AND i.status::text IN ${LIVE} AND i.discount > 0 ${period(Prisma.sql`i.date`, p)} ${eq(Prisma.sql`i."clientId"`, p.clientId)}`;
+  const where = Prisma.sql`i.\`agencyId\` = ${a} AND i.status IN ${LIVE} AND i.discount > 0 ${period(Prisma.sql`i.date`, p)} ${eq(Prisma.sql`i.\`clientId\``, p.clientId)}`;
   const db = tenantDb(a);
   const [rows, [agg]] = await Promise.all([
     db.$queryRaw<
@@ -195,11 +197,11 @@ export async function clientDiscount(
         net: Dec;
       }[]
     >`
-      SELECT i.id, i.type::text AS type, i.number, i.date, c.name AS client, i.subtotal, i.discount, i."netTotal" AS net
-      FROM "Invoice" i JOIN "Client" c ON c.id = i."clientId" WHERE ${where} ORDER BY i.date, i.number ${page(p, all)}`,
+      SELECT i.id, i.type AS type, i.number, i.date, c.name AS client, i.subtotal, i.discount, i.\`netTotal\` AS net
+      FROM \`Invoice\` i JOIN \`Client\` c ON c.id = i.\`clientId\` WHERE ${where} ORDER BY i.date, i.number ${page(p, all)}`,
     db.$queryRaw<
       { n: bigint; discount: Dec }[]
-    >`SELECT COUNT(*) AS n, SUM(i.discount) AS discount FROM "Invoice" i WHERE ${where}`,
+    >`SELECT COUNT(*) AS n, SUM(i.discount) AS discount FROM \`Invoice\` i WHERE ${where}`,
   ]);
   return {
     key: "client-discount",
@@ -243,12 +245,12 @@ export async function tourPackage(ctx: ServiceContext, p: ReportParams): Promise
       due: Dec;
     }[]
   >`
-    SELECT i.id, i.number, i.date, c.name AS client, tg.name AS tour, i."travelDate" AS travel,
-           i."netTotal" - i."refundCredit" AS sales, i."totalCost" - i."refundCost" AS cost,
-           i.profit - i."refundCredit" + i."refundCost" AS profit,
-           GREATEST(i."netTotal" - i."refundCredit" - i."paidAmount", 0) AS due
-    FROM "Invoice" i JOIN "Client" c ON c.id = i."clientId" LEFT JOIN "TourGroup" tg ON tg.id = i."tourGroupId"
-    WHERE i."agencyId" = ${a} AND i.type = 'TOUR' AND i.status::text IN ${LIVE} ${period(Prisma.sql`i.date`, p)}
+    SELECT i.id, i.number, i.date, c.name AS client, tg.name AS tour, i.\`travelDate\` AS travel,
+           i.\`netTotal\` - i.\`refundCredit\` AS sales, i.\`totalCost\` - i.\`refundCost\` AS cost,
+           i.profit - i.\`refundCredit\` + i.\`refundCost\` AS profit,
+           GREATEST(i.\`netTotal\` - i.\`refundCredit\` - i.\`paidAmount\`, 0) AS due
+    FROM \`Invoice\` i JOIN \`Client\` c ON c.id = i.\`clientId\` LEFT JOIN \`TourGroup\` tg ON tg.id = i.\`tourGroupId\`
+    WHERE i.\`agencyId\` = ${a} AND i.type = 'TOUR' AND i.status IN ${LIVE} ${period(Prisma.sql`i.date`, p)}
     ORDER BY i.date, i.number`;
   const out = rows.map((r) => ({
     date: iso(r.date),
@@ -291,8 +293,8 @@ export async function journeyDate(
   all = false,
 ): Promise<ReportResult> {
   const a = ctx.agencyId;
-  const where = Prisma.sql`t."agencyId" = ${a} AND i.status::text IN ('POSTED','PARTIAL','PAID') ${period(Prisma.sql`t."journeyDate"`, p)}
-    ${eq(Prisma.sql`t."airlineId"`, p.airlineId)} ${eq(Prisma.sql`i."clientId"`, p.clientId)}`;
+  const where = Prisma.sql`t.\`agencyId\` = ${a} AND i.status IN ('POSTED','PARTIAL','PAID') ${period(Prisma.sql`t.\`journeyDate\``, p)}
+    ${eq(Prisma.sql`t.\`airlineId\``, p.airlineId)} ${eq(Prisma.sql`i.\`clientId\``, p.clientId)}`;
   const db = tenantDb(a);
   const [rows, [agg]] = await Promise.all([
     db.$queryRaw<
@@ -311,14 +313,14 @@ export async function journeyDate(
         due: Dec;
       }[]
     >`
-      SELECT i.id, i.type::text AS type, i.number, t."journeyDate" AS journey, t."passengerName" AS pax, al.iata, t.route, t.pnr,
-             c.name AS client, c.phone, v.name AS vendor, GREATEST(i."netTotal" - i."refundCredit" - i."paidAmount", 0) AS due
-      FROM "InvoiceAirTicket" t JOIN "Invoice" i ON i.id = t."invoiceId" JOIN "Airline" al ON al.id = t."airlineId"
-      JOIN "Client" c ON c.id = i."clientId" JOIN "Vendor" v ON v.id = t."vendorId"
-      WHERE ${where} ORDER BY t."journeyDate", t."passengerName" ${page(p, all)}`,
+      SELECT i.id, i.type AS type, i.number, t.\`journeyDate\` AS journey, t.\`passengerName\` AS pax, al.iata, t.route, t.pnr,
+             c.name AS client, c.phone, v.name AS vendor, GREATEST(i.\`netTotal\` - i.\`refundCredit\` - i.\`paidAmount\`, 0) AS due
+      FROM \`InvoiceAirTicket\` t JOIN \`Invoice\` i ON i.id = t.\`invoiceId\` JOIN \`Airline\` al ON al.id = t.\`airlineId\`
+      JOIN \`Client\` c ON c.id = i.\`clientId\` JOIN \`Vendor\` v ON v.id = t.\`vendorId\`
+      WHERE ${where} ORDER BY t.\`journeyDate\`, t.\`passengerName\` ${page(p, all)}`,
     db.$queryRaw<
       { n: bigint }[]
-    >`SELECT COUNT(*) AS n FROM "InvoiceAirTicket" t JOIN "Invoice" i ON i.id = t."invoiceId" WHERE ${where}`,
+    >`SELECT COUNT(*) AS n FROM \`InvoiceAirTicket\` t JOIN \`Invoice\` i ON i.id = t.\`invoiceId\` WHERE ${where}`,
   ]);
   return {
     key: "journey-date",
@@ -366,12 +368,12 @@ export async function countryWise(ctx: ServiceContext, p: ReportParams): Promise
     }[]
   >`
     SELECT v.country, COUNT(*) AS n,
-           COUNT(*) FILTER (WHERE v.status IN ('PENDING','SUBMITTED','APPROVED')) AS "inProcess",
-           COUNT(*) FILTER (WHERE v.status = 'DELIVERED') AS delivered,
-           COUNT(*) FILTER (WHERE v.status = 'REJECTED') AS rejected,
-           SUM(v."clientPrice") AS sales, SUM(v.profit) AS profit
-    FROM "InvoiceVisaLine" v JOIN "Invoice" i ON i.id = v."invoiceId"
-    WHERE v."agencyId" = ${a} AND i.status::text IN ${LIVE} ${period(Prisma.sql`i.date`, p)}
+           COUNT(CASE WHEN v.status IN ('PENDING','SUBMITTED','APPROVED') THEN 1 END) AS \`inProcess\`,
+           COUNT(CASE WHEN v.status = 'DELIVERED' THEN 1 END) AS delivered,
+           COUNT(CASE WHEN v.status = 'REJECTED' THEN 1 END) AS rejected,
+           SUM(v.\`clientPrice\`) AS sales, SUM(v.profit) AS profit
+    FROM \`InvoiceVisaLine\` v JOIN \`Invoice\` i ON i.id = v.\`invoiceId\`
+    WHERE v.\`agencyId\` = ${a} AND i.status IN ${LIVE} ${period(Prisma.sql`i.date`, p)}
     GROUP BY v.country ORDER BY n DESC`;
   const out = rows.map((r) => ({
     country: r.country,
@@ -408,7 +410,7 @@ export async function vendorPayments(
   all = false,
 ): Promise<ReportResult> {
   const a = ctx.agencyId;
-  const where = Prisma.sql`vp."agencyId" = ${a} AND vp.status = 'POSTED' ${period(Prisma.sql`vp.date`, p)} ${eq(Prisma.sql`vp."vendorId"`, p.vendorId)}`;
+  const where = Prisma.sql`vp.\`agencyId\` = ${a} AND vp.status = 'POSTED' ${period(Prisma.sql`vp.date`, p)} ${eq(Prisma.sql`vp.\`vendorId\``, p.vendorId)}`;
   const db = tenantDb(a);
   const [rows, [agg]] = await Promise.all([
     db.$queryRaw<
@@ -424,12 +426,12 @@ export async function vendorPayments(
         reference: string | null;
       }[]
     >`
-      SELECT vp.number, vp.date, v.id AS "vendorId", v.name AS vendor, ma.name AS account, vp."paymentMethod"::text AS method,
-             vp.amount, vp."transactionCharge" AS charge, vp.reference
-      FROM "VendorPayment" vp JOIN "Vendor" v ON v.id = vp."vendorId" JOIN "MoneyAccount" ma ON ma.id = vp."moneyAccountId"
+      SELECT vp.number, vp.date, v.id AS \`vendorId\`, v.name AS vendor, ma.name AS account, vp.\`paymentMethod\` AS method,
+             vp.amount, vp.\`transactionCharge\` AS charge, vp.reference
+      FROM \`VendorPayment\` vp JOIN \`Vendor\` v ON v.id = vp.\`vendorId\` JOIN \`MoneyAccount\` ma ON ma.id = vp.\`moneyAccountId\`
       WHERE ${where} ORDER BY vp.date, vp.number ${page(p, all)}`,
     db.$queryRaw<{ n: bigint; amount: Dec; charge: Dec }[]>`
-      SELECT COUNT(*) AS n, SUM(vp.amount) AS amount, SUM(vp."transactionCharge") AS charge FROM "VendorPayment" vp WHERE ${where}`,
+      SELECT COUNT(*) AS n, SUM(vp.amount) AS amount, SUM(vp.\`transactionCharge\`) AS charge FROM \`VendorPayment\` vp WHERE ${where}`,
   ]);
   return {
     key: "vendor-payments",
@@ -471,22 +473,22 @@ export async function vendorPurchases(
   all = false,
 ): Promise<ReportResult> {
   const a = ctx.agencyId;
-  const inv = Prisma.sql`i.status::text IN ${LIVE} ${period(Prisma.sql`i.date`, p)}`;
+  const inv = Prisma.sql`i.status IN ${LIVE} ${period(Prisma.sql`i.date`, p)}`;
   const vf = (col: Prisma.Sql) => eq(col, p.vendorId);
   const base = Prisma.sql`
     WITH x AS (
-      SELECT i.id AS "invoiceId", i.type::text AS type, i.number, i.date, t."vendorId", t."ticketNo" || ' · ' || t."passengerName" AS description, t."purchasePrice" AS cost
-      FROM "InvoiceAirTicket" t JOIN "Invoice" i ON i.id = t."invoiceId" WHERE t."agencyId" = ${a} AND ${inv} ${vf(Prisma.sql`t."vendorId"`)}
+      SELECT i.id AS \`invoiceId\`, i.type AS type, i.number, i.date, t.\`vendorId\`, CONCAT(t.\`ticketNo\`, ' · ', t.\`passengerName\`) AS description, t.\`purchasePrice\` AS cost
+      FROM \`InvoiceAirTicket\` t JOIN \`Invoice\` i ON i.id = t.\`invoiceId\` WHERE t.\`agencyId\` = ${a} AND ${inv} ${vf(Prisma.sql`t.\`vendorId\``)}
       UNION ALL
-      SELECT i.id, i.type::text, i.number, i.date, it."vendorId", it.description, it."purchasePrice"
-      FROM "InvoiceItem" it JOIN "Invoice" i ON i.id = it."invoiceId"
-      WHERE it."agencyId" = ${a} AND it."vendorId" IS NOT NULL AND it."purchasePrice" > 0 AND ${inv} ${vf(Prisma.sql`it."vendorId"`)}
+      SELECT i.id, i.type, i.number, i.date, it.\`vendorId\`, it.description, it.\`purchasePrice\`
+      FROM \`InvoiceItem\` it JOIN \`Invoice\` i ON i.id = it.\`invoiceId\`
+      WHERE it.\`agencyId\` = ${a} AND it.\`vendorId\` IS NOT NULL AND it.\`purchasePrice\` > 0 AND ${inv} ${vf(Prisma.sql`it.\`vendorId\``)}
       UNION ALL
-      SELECT i.id, i.type::text, i.number, i.date, v."vendorId", v.country || ' visa · ' || v."passengerName", v."purchasePrice"
-      FROM "InvoiceVisaLine" v JOIN "Invoice" i ON i.id = v."invoiceId" WHERE v."agencyId" = ${a} AND v."purchasePrice" > 0 AND ${inv} ${vf(Prisma.sql`v."vendorId"`)}
+      SELECT i.id, i.type, i.number, i.date, v.\`vendorId\`, CONCAT(v.country, ' visa · ', v.\`passengerName\`), v.\`purchasePrice\`
+      FROM \`InvoiceVisaLine\` v JOIN \`Invoice\` i ON i.id = v.\`invoiceId\` WHERE v.\`agencyId\` = ${a} AND v.\`purchasePrice\` > 0 AND ${inv} ${vf(Prisma.sql`v.\`vendorId\``)}
       UNION ALL
-      SELECT i.id, i.type::text, i.number, i.date, r."vendorId", 'Reissue · ' || r."passengerName", r."purchasePrice"
-      FROM "InvoiceReissueLine" r JOIN "Invoice" i ON i.id = r."invoiceId" WHERE r."agencyId" = ${a} AND r."purchasePrice" > 0 AND ${inv} ${vf(Prisma.sql`r."vendorId"`)}
+      SELECT i.id, i.type, i.number, i.date, r.\`vendorId\`, CONCAT('Reissue · ', r.\`passengerName\`), r.\`purchasePrice\`
+      FROM \`InvoiceReissueLine\` r JOIN \`Invoice\` i ON i.id = r.\`invoiceId\` WHERE r.\`agencyId\` = ${a} AND r.\`purchasePrice\` > 0 AND ${inv} ${vf(Prisma.sql`r.\`vendorId\``)}
     )`;
   const db = tenantDb(a);
   const [rows, [agg]] = await Promise.all([
@@ -501,7 +503,7 @@ export async function vendorPurchases(
         cost: Dec;
       }[]
     >`
-      ${base} SELECT x.*, vd.name AS vendor FROM x JOIN "Vendor" vd ON vd.id = x."vendorId" ORDER BY x.date, x.number ${page(p, all)}`,
+      ${base} SELECT x.*, vd.name AS vendor FROM x JOIN \`Vendor\` vd ON vd.id = x.\`vendorId\` ORDER BY x.date, x.number ${page(p, all)}`,
     db.$queryRaw<
       { n: bigint; cost: Dec }[]
     >`${base} SELECT COUNT(*) AS n, SUM(cost) AS cost FROM x`,
@@ -539,17 +541,17 @@ export async function payrollSummary(ctx: ServiceContext, p: ReportParams): Prom
     { employee: string; months: bigint; gross: Dec; advance: Dec; net: Dec; advanced: Dec }[]
   >`
     WITH pay AS (
-      SELECT "employeeId" AS id, COUNT(*) AS months, SUM(basic + "allowanceTotal" - "deductionTotal") AS gross,
-             SUM("advanceAdjusted") AS advance, SUM("netPaid") AS net
-      FROM "Payroll" WHERE "agencyId" = ${a} AND status = 'POSTED' ${period(Prisma.sql`date`, p)} GROUP BY "employeeId"
+      SELECT \`employeeId\` AS id, COUNT(*) AS months, SUM(basic + \`allowanceTotal\` - \`deductionTotal\`) AS gross,
+             SUM(\`advanceAdjusted\`) AS advance, SUM(\`netPaid\`) AS net
+      FROM \`Payroll\` WHERE \`agencyId\` = ${a} AND status = 'POSTED' ${period(Prisma.sql`date`, p)} GROUP BY \`employeeId\`
     ), adv AS (
-      SELECT "partyId" AS id, SUM(amount) AS advanced FROM "Voucher"
-      WHERE "agencyId" = ${a} AND kind = 'EMPLOYEE_ADVANCE' AND status = 'POSTED' ${period(Prisma.sql`date`, p)} GROUP BY "partyId"
+      SELECT \`partyId\` AS id, SUM(amount) AS advanced FROM \`Voucher\`
+      WHERE \`agencyId\` = ${a} AND kind = 'EMPLOYEE_ADVANCE' AND status = 'POSTED' ${period(Prisma.sql`date`, p)} GROUP BY \`partyId\`
     )
     SELECT e.name AS employee, COALESCE(pay.months, 0) AS months, COALESCE(pay.gross, 0) AS gross,
            COALESCE(pay.advance, 0) AS advance, COALESCE(pay.net, 0) AS net, COALESCE(adv.advanced, 0) AS advanced
-    FROM "Employee" e LEFT JOIN pay ON pay.id = e.id LEFT JOIN adv ON adv.id = e.id
-    WHERE e."agencyId" = ${a} AND (pay.id IS NOT NULL OR adv.id IS NOT NULL)
+    FROM \`Employee\` e LEFT JOIN pay ON pay.id = e.id LEFT JOIN adv ON adv.id = e.id
+    WHERE e.\`agencyId\` = ${a} AND (pay.id IS NOT NULL OR adv.id IS NOT NULL)
     ORDER BY e.name`;
   const out = rows.map((r) => ({
     employee: r.employee,
@@ -592,11 +594,11 @@ export async function loanReport(ctx: ServiceContext): Promise<ReportResult> {
       status: string;
     }[]
   >`
-    SELECT l.id, l.number, l.kind::text AS kind, l.date, la.name AS authority, l.principal, l."interestRate" AS rate, l.repaid,
-           COALESCE((SELECT SUM(interest) FROM "LoanPayment" lp WHERE lp."loanId" = l.id AND lp.status = 'POSTED'), 0) AS interest,
-           l.status::text AS status
-    FROM "Loan" l JOIN "LoanAuthority" la ON la.id = l."authorityId"
-    WHERE l."agencyId" = ${a} AND l.status <> 'VOID'
+    SELECT l.id, l.number, l.kind AS kind, l.date, la.name AS authority, l.principal, l.\`interestRate\` AS rate, l.repaid,
+           COALESCE((SELECT SUM(interest) FROM \`LoanPayment\` lp WHERE lp.\`loanId\` = l.id AND lp.status = 'POSTED'), 0) AS interest,
+           l.status AS status
+    FROM \`Loan\` l JOIN \`LoanAuthority\` la ON la.id = l.\`authorityId\`
+    WHERE l.\`agencyId\` = ${a} AND l.status <> 'VOID'
     ORDER BY l.kind, l.date`;
   const KIND: Record<string, string> = {
     TAKEN: "Taken",
@@ -656,17 +658,17 @@ export async function transactionCharges(
       charge: Dec;
     }[]
   >`
-    SELECT 'Money receipt' AS kind, r.number, r.date, c.name AS party, ma.name AS account, r.amount, r."transactionCharge" AS charge
-    FROM "MoneyReceipt" r JOIN "Client" c ON c.id = r."clientId" JOIN "MoneyAccount" ma ON ma.id = r."moneyAccountId"
-    WHERE r."agencyId" = ${a} AND r.status = 'POSTED' AND r."transactionCharge" > 0 ${period(Prisma.sql`r.date`, p)}
+    SELECT 'Money receipt' AS kind, r.number, r.date, c.name AS party, ma.name AS account, r.amount, r.\`transactionCharge\` AS charge
+    FROM \`MoneyReceipt\` r JOIN \`Client\` c ON c.id = r.\`clientId\` JOIN \`MoneyAccount\` ma ON ma.id = r.\`moneyAccountId\`
+    WHERE r.\`agencyId\` = ${a} AND r.status = 'POSTED' AND r.\`transactionCharge\` > 0 ${period(Prisma.sql`r.date`, p)}
     UNION ALL
-    SELECT 'Vendor payment', vp.number, vp.date, v.name, ma.name, vp.amount, vp."transactionCharge"
-    FROM "VendorPayment" vp JOIN "Vendor" v ON v.id = vp."vendorId" JOIN "MoneyAccount" ma ON ma.id = vp."moneyAccountId"
-    WHERE vp."agencyId" = ${a} AND vp.status = 'POSTED' AND vp."transactionCharge" > 0 ${period(Prisma.sql`vp.date`, p)}
+    SELECT 'Vendor payment', vp.number, vp.date, v.name, ma.name, vp.amount, vp.\`transactionCharge\`
+    FROM \`VendorPayment\` vp JOIN \`Vendor\` v ON v.id = vp.\`vendorId\` JOIN \`MoneyAccount\` ma ON ma.id = vp.\`moneyAccountId\`
+    WHERE vp.\`agencyId\` = ${a} AND vp.status = 'POSTED' AND vp.\`transactionCharge\` > 0 ${period(Prisma.sql`vp.date`, p)}
     UNION ALL
-    SELECT 'Balance transfer', bt.number, bt.date, f.name || ' → ' || t.name, f.name, bt.amount, bt.charge
-    FROM "BalanceTransfer" bt JOIN "MoneyAccount" f ON f.id = bt."fromAccountId" JOIN "MoneyAccount" t ON t.id = bt."toAccountId"
-    WHERE bt."agencyId" = ${a} AND bt.status = 'POSTED' AND bt.charge > 0 ${period(Prisma.sql`bt.date`, p)}
+    SELECT 'Balance transfer', bt.number, bt.date, CONCAT(f.name, ' → ', t.name), f.name, bt.amount, bt.charge
+    FROM \`BalanceTransfer\` bt JOIN \`MoneyAccount\` f ON f.id = bt.\`fromAccountId\` JOIN \`MoneyAccount\` t ON t.id = bt.\`toAccountId\`
+    WHERE bt.\`agencyId\` = ${a} AND bt.status = 'POSTED' AND bt.charge > 0 ${period(Prisma.sql`bt.date`, p)}
     ORDER BY date, number`;
   const out = rows.map((r) => ({
     date: iso(r.date),
@@ -701,7 +703,7 @@ export async function refundReport(
   all = false,
 ): Promise<ReportResult> {
   const a = ctx.agencyId;
-  const where = Prisma.sql`rf."agencyId" = ${a} AND rf.status = 'POSTED' ${period(Prisma.sql`rf.date`, p)} ${eq(Prisma.sql`rf."clientId"`, p.clientId)}`;
+  const where = Prisma.sql`rf.\`agencyId\` = ${a} AND rf.status = 'POSTED' ${period(Prisma.sql`rf.date`, p)} ${eq(Prisma.sql`rf.\`clientId\``, p.clientId)}`;
   const db = tenantDb(a);
   const [rows, [agg]] = await Promise.all([
     db.$queryRaw<
@@ -719,15 +721,15 @@ export async function refundReport(
         returned: Dec;
       }[]
     >`
-      SELECT rf.id, rf.number, rf.type::text AS type, rf.date, c.name AS client, i.number AS invoice,
-             rf."clientRefundAmount" AS refunded, rf."clientCharge" AS charge,
-             rf."vendorRefundAmount" - rf."vendorCharge" AS "vendorCredit", rf.method::text AS method, rf."returnAmount" AS returned
-      FROM "Refund" rf JOIN "Client" c ON c.id = rf."clientId" JOIN "Invoice" i ON i.id = rf."invoiceId"
+      SELECT rf.id, rf.number, rf.type AS type, rf.date, c.name AS client, i.number AS invoice,
+             rf.\`clientRefundAmount\` AS refunded, rf.\`clientCharge\` AS charge,
+             rf.\`vendorRefundAmount\` - rf.\`vendorCharge\` AS \`vendorCredit\`, rf.method AS method, rf.\`returnAmount\` AS returned
+      FROM \`Refund\` rf JOIN \`Client\` c ON c.id = rf.\`clientId\` JOIN \`Invoice\` i ON i.id = rf.\`invoiceId\`
       WHERE ${where} ORDER BY rf.date, rf.number ${page(p, all)}`,
     db.$queryRaw<{ n: bigint; refunded: Dec; charge: Dec; vendorCredit: Dec; returned: Dec }[]>`
-      SELECT COUNT(*) AS n, SUM(rf."clientRefundAmount") AS refunded, SUM(rf."clientCharge") AS charge,
-             SUM(rf."vendorRefundAmount" - rf."vendorCharge") AS "vendorCredit", SUM(rf."returnAmount") AS returned
-      FROM "Refund" rf WHERE ${where}`,
+      SELECT COUNT(*) AS n, SUM(rf.\`clientRefundAmount\`) AS refunded, SUM(rf.\`clientCharge\`) AS charge,
+             SUM(rf.\`vendorRefundAmount\` - rf.\`vendorCharge\`) AS \`vendorCredit\`, SUM(rf.\`returnAmount\`) AS returned
+      FROM \`Refund\` rf WHERE ${where}`,
   ]);
   return {
     key: "refund-report",
@@ -777,7 +779,7 @@ export async function loginHistory(
   all = false,
 ): Promise<ReportResult> {
   const a = ctx.agencyId;
-  const where = Prisma.sql`lh."agencyId" = ${a} ${periodTs(Prisma.sql`lh."at"`, p)} ${eq(Prisma.sql`lh."userId"`, p.userId)}`;
+  const where = Prisma.sql`lh.\`agencyId\` = ${a} ${periodTs(Prisma.sql`lh.\`at\``, p)} ${eq(Prisma.sql`lh.\`userId\``, p.userId)}`;
   const db = tenantDb(a);
   const [rows, [agg]] = await Promise.all([
     db.$queryRaw<
@@ -790,11 +792,11 @@ export async function loginHistory(
         userAgent: string | null;
       }[]
     >`
-      SELECT lh."at", lh.username, u.name, lh.success, lh.ip, lh."userAgent"
-      FROM "LoginHistory" lh LEFT JOIN "User" u ON u.id = lh."userId"
-      WHERE ${where} ORDER BY lh."at" DESC ${page(p, all)}`,
+      SELECT lh.\`at\`, lh.username, u.name, lh.success, lh.ip, lh.\`userAgent\`
+      FROM \`LoginHistory\` lh LEFT JOIN \`User\` u ON u.id = lh.\`userId\`
+      WHERE ${where} ORDER BY lh.\`at\` DESC ${page(p, all)}`,
     db.$queryRaw<{ n: bigint; failed: bigint }[]>`
-      SELECT COUNT(*) AS n, COUNT(*) FILTER (WHERE NOT lh.success) AS failed FROM "LoginHistory" lh WHERE ${where}`,
+      SELECT COUNT(*) AS n, COUNT(CASE WHEN NOT lh.success THEN 1 END) AS failed FROM \`LoginHistory\` lh WHERE ${where}`,
   ]);
   return {
     key: "login-history",
@@ -837,7 +839,7 @@ export async function auditTrail(
   all = false,
 ): Promise<ReportResult> {
   const a = ctx.agencyId;
-  const where = Prisma.sql`al."agencyId" = ${a} ${periodTs(Prisma.sql`al."createdAt"`, p)} ${eq(Prisma.sql`al."userId"`, p.userId)}`;
+  const where = Prisma.sql`al.\`agencyId\` = ${a} ${periodTs(Prisma.sql`al.\`createdAt\``, p)} ${eq(Prisma.sql`al.\`userId\``, p.userId)}`;
   const db = tenantDb(a);
   const [rows, [agg]] = await Promise.all([
     db.$queryRaw<
@@ -850,11 +852,12 @@ export async function auditTrail(
         number: string | null;
       }[]
     >`
-      SELECT al."createdAt" AS at, u.name AS user, al.action, al.entity, al."entityId",
-             COALESCE(al.after->>'number', al.before->>'number', al.after->>'name', al.before->>'name') AS number
-      FROM "AuditLog" al LEFT JOIN "User" u ON u.id = al."userId"
-      WHERE ${where} ORDER BY al."createdAt" DESC ${page(p, all)}`,
-    db.$queryRaw<{ n: bigint }[]>`SELECT COUNT(*) AS n FROM "AuditLog" al WHERE ${where}`,
+      SELECT al.\`createdAt\` AS at, u.name AS user, al.action, al.entity, al.\`entityId\`,
+             COALESCE(JSON_VALUE(al.after, '$.number'), JSON_VALUE(al.before, '$.number'),
+                      JSON_VALUE(al.after, '$.name'), JSON_VALUE(al.before, '$.name')) AS number
+      FROM \`AuditLog\` al LEFT JOIN \`User\` u ON u.id = al.\`userId\`
+      WHERE ${where} ORDER BY al.\`createdAt\` DESC ${page(p, all)}`,
+    db.$queryRaw<{ n: bigint }[]>`SELECT COUNT(*) AS n FROM \`AuditLog\` al WHERE ${where}`,
   ]);
   return {
     key: "audit-trail",

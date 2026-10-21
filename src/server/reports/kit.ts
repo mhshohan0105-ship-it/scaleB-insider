@@ -32,9 +32,14 @@ export function period(col: Prisma.Sql, p: ReportParams): Prisma.Sql {
   return parts.length ? Prisma.join(parts, " ") : Prisma.empty;
 }
 
+/** A UTC timestamp column as its Asia/Dhaka calendar day (UTC+6, no DST). */
+export function dhakaDay(col: Prisma.Sql): Prisma.Sql {
+  return Prisma.sql`DATE(CONVERT_TZ(${col}, '+00:00', '+06:00'))`;
+}
+
 /** Same, for timestamp columns compared by their Asia/Dhaka day. */
 export function periodTs(col: Prisma.Sql, p: ReportParams): Prisma.Sql {
-  return period(Prisma.sql`(${col} AT TIME ZONE 'Asia/Dhaka')::date`, p);
+  return period(dhakaDay(col), p);
 }
 
 export function periodLabel(p: ReportParams, label = ""): string {

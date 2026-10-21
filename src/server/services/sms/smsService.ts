@@ -133,13 +133,13 @@ export async function sendPassportReminders(ctx: ServiceContext, today = todayIs
   const due = await db.$queryRaw<
     { id: string; name: string; passportNo: string; expiry: Date; phone: string | null }[]
   >`
-    SELECT p.id, p.name, p."passportNo", p."expiryDate" AS expiry, COALESCE(p.phone, c.phone) AS phone
-    FROM "Passport" p LEFT JOIN "Client" c ON c.id = p."clientId"
-    WHERE p."agencyId" = ${ctx.agencyId} AND p."isActive"
-      AND p."expiryDate" > ${sqlDate(today)} AND p."expiryDate" < ${sqlDate(addMonthsIso(today, 6))}
+    SELECT p.id, p.name, p.\`passportNo\`, p.\`expiryDate\` AS expiry, COALESCE(p.phone, c.phone) AS phone
+    FROM \`Passport\` p LEFT JOIN \`Client\` c ON c.id = p.\`clientId\`
+    WHERE p.\`agencyId\` = ${ctx.agencyId} AND p.\`isActive\`
+      AND p.\`expiryDate\` > ${sqlDate(today)} AND p.\`expiryDate\` < ${sqlDate(addMonthsIso(today, 6))}
       AND NOT EXISTS (
-        SELECT 1 FROM "SmsLog" s WHERE s."agencyId" = p."agencyId" AND s."relatedType" = 'PASSPORT'
-          AND s."relatedId" = p.id AND s.status <> 'FAILED' AND s."createdAt" > now() - interval '30 days')`;
+        SELECT 1 FROM \`SmsLog\` s WHERE s.\`agencyId\` = p.\`agencyId\` AND s.\`relatedType\` = 'PASSPORT'
+          AND s.\`relatedId\` = p.id AND s.status <> 'FAILED' AND s.\`createdAt\` > UTC_TIMESTAMP(3) - INTERVAL 30 DAY)`;
   const agency = await getProfile(ctx);
   let sent = 0;
   let skipped = 0;
@@ -169,7 +169,7 @@ export async function listSmsLogs(ctx: ServiceContext, params: ListParams) {
   const db = tenantDb(ctx.agencyId);
   const where: Prisma.SmsLogWhereInput = {};
   const q = params.q?.trim();
-  if (q) where.OR = [{ to: { contains: q } }, { message: { contains: q, mode: "insensitive" } }];
+  if (q) where.OR = [{ to: { contains: q } }, { message: { contains: q } }];
   if (params.from || params.to)
     where.createdAt = {
       ...(params.from ? { gte: new Date(`${params.from}T00:00:00+06:00`) } : {}),

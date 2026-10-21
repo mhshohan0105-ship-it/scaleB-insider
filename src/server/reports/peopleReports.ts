@@ -21,11 +21,11 @@ export async function passportStatus(ctx: ServiceContext): Promise<ReportResult>
     { status: string | null; n: bigint; expired: bigint; soon: bigint; withUs: bigint }[]
   >`
     SELECT s.name AS status, COUNT(*) AS n,
-           COUNT(*) FILTER (WHERE p."expiryDate" <= ${sqlDate(today)}) AS expired,
-           COUNT(*) FILTER (WHERE p."expiryDate" > ${sqlDate(today)} AND p."expiryDate" < ${sqlDate(warn)}) AS soon,
-           COUNT(*) FILTER (WHERE p."receivedDate" IS NOT NULL AND p."returnedDate" IS NULL) AS "withUs"
-    FROM "Passport" p LEFT JOIN "PassportStatus" s ON s.id = p."statusId"
-    WHERE p."agencyId" = ${a} AND p."isActive"
+           COUNT(CASE WHEN p.\`expiryDate\` <= ${sqlDate(today)} THEN 1 END) AS expired,
+           COUNT(CASE WHEN p.\`expiryDate\` > ${sqlDate(today)} AND p.\`expiryDate\` < ${sqlDate(warn)} THEN 1 END) AS soon,
+           COUNT(CASE WHEN p.\`receivedDate\` IS NOT NULL AND p.\`returnedDate\` IS NULL THEN 1 END) AS \`withUs\`
+    FROM \`Passport\` p LEFT JOIN \`PassportStatus\` s ON s.id = p.\`statusId\`
+    WHERE p.\`agencyId\` = ${a} AND p.\`isActive\`
     GROUP BY s.name ORDER BY n DESC`;
   const out = rows.map((r) => ({
     status: r.status ?? "(no status)",
@@ -65,7 +65,7 @@ export async function passportList(
 ): Promise<ReportResult> {
   const a = ctx.agencyId;
   const today = todayIso();
-  const where = Prisma.sql`p."agencyId" = ${a} AND p."isActive" ${eq(Prisma.sql`p."clientId"`, p.clientId)}`;
+  const where = Prisma.sql`p.\`agencyId\` = ${a} AND p.\`isActive\` ${eq(Prisma.sql`p.\`clientId\``, p.clientId)}`;
   const db = tenantDb(a);
   const [rows, [agg]] = await Promise.all([
     db.$queryRaw<
@@ -79,10 +79,10 @@ export async function passportList(
         status: string | null;
       }[]
     >`
-      SELECT p.id, p."passportNo", p.name, c.name AS client, p.phone, p."expiryDate" AS expiry, s.name AS status
-      FROM "Passport" p LEFT JOIN "Client" c ON c.id = p."clientId" LEFT JOIN "PassportStatus" s ON s.id = p."statusId"
-      WHERE ${where} ORDER BY p."expiryDate" ${page(p, all)}`,
-    db.$queryRaw<{ n: bigint }[]>`SELECT COUNT(*) AS n FROM "Passport" p WHERE ${where}`,
+      SELECT p.id, p.\`passportNo\`, p.name, c.name AS client, p.phone, p.\`expiryDate\` AS expiry, s.name AS status
+      FROM \`Passport\` p LEFT JOIN \`Client\` c ON c.id = p.\`clientId\` LEFT JOIN \`PassportStatus\` s ON s.id = p.\`statusId\`
+      WHERE ${where} ORDER BY p.\`expiryDate\` ${page(p, all)}`,
+    db.$queryRaw<{ n: bigint }[]>`SELECT COUNT(*) AS n FROM \`Passport\` p WHERE ${where}`,
   ]);
   return {
     key: "passport-list",
@@ -122,21 +122,21 @@ export async function passengersClient(
   all = false,
 ): Promise<ReportResult> {
   const a = ctx.agencyId;
-  const inv = Prisma.sql`i.status::text IN ${LIVE} ${period(Prisma.sql`i.date`, p)} ${eq(Prisma.sql`i."clientId"`, p.clientId)}`;
+  const inv = Prisma.sql`i.status IN ${LIVE} ${period(Prisma.sql`i.date`, p)} ${eq(Prisma.sql`i.\`clientId\``, p.clientId)}`;
   const base = Prisma.sql`
     WITH x AS (
-      SELECT i.id AS "invoiceId", i.type::text AS type, i.number, i.date, c.name AS client,
-             t."passengerName" AS pax, t."passportNo" AS passport, 'Ticket ' || t."ticketNo" || ' · ' || t.route AS service
-      FROM "InvoiceAirTicket" t JOIN "Invoice" i ON i.id = t."invoiceId" JOIN "Client" c ON c.id = i."clientId"
-      WHERE t."agencyId" = ${a} AND ${inv}
+      SELECT i.id AS \`invoiceId\`, i.type AS type, i.number, i.date, c.name AS client,
+             t.\`passengerName\` AS pax, t.\`passportNo\` AS passport, CONCAT('Ticket ', t.\`ticketNo\`, ' · ', t.route) AS service
+      FROM \`InvoiceAirTicket\` t JOIN \`Invoice\` i ON i.id = t.\`invoiceId\` JOIN \`Client\` c ON c.id = i.\`clientId\`
+      WHERE t.\`agencyId\` = ${a} AND ${inv}
       UNION ALL
-      SELECT i.id, i.type::text, i.number, i.date, c.name, v."passengerName", v."passportNo", v.country || ' visa'
-      FROM "InvoiceVisaLine" v JOIN "Invoice" i ON i.id = v."invoiceId" JOIN "Client" c ON c.id = i."clientId"
-      WHERE v."agencyId" = ${a} AND ${inv}
+      SELECT i.id, i.type, i.number, i.date, c.name, v.\`passengerName\`, v.\`passportNo\`, CONCAT(v.country, ' visa')
+      FROM \`InvoiceVisaLine\` v JOIN \`Invoice\` i ON i.id = v.\`invoiceId\` JOIN \`Client\` c ON c.id = i.\`clientId\`
+      WHERE v.\`agencyId\` = ${a} AND ${inv}
       UNION ALL
-      SELECT i.id, i.type::text, i.number, i.date, c.name, it."passengerName", it."passportNo", it.description
-      FROM "InvoiceItem" it JOIN "Invoice" i ON i.id = it."invoiceId" JOIN "Client" c ON c.id = i."clientId"
-      WHERE it."agencyId" = ${a} AND it."passengerName" IS NOT NULL AND ${inv}
+      SELECT i.id, i.type, i.number, i.date, c.name, it.\`passengerName\`, it.\`passportNo\`, it.description
+      FROM \`InvoiceItem\` it JOIN \`Invoice\` i ON i.id = it.\`invoiceId\` JOIN \`Client\` c ON c.id = i.\`clientId\`
+      WHERE it.\`agencyId\` = ${a} AND it.\`passengerName\` IS NOT NULL AND ${inv}
     )`;
   const db = tenantDb(a);
   const [rows, [agg]] = await Promise.all([
@@ -183,7 +183,7 @@ export async function passengersClient(
 
 async function pilgrimRows(ctx: ServiceContext, p: ReportParams, all: boolean, extra: Prisma.Sql) {
   const a = ctx.agencyId;
-  const where = Prisma.sql`p."agencyId" = ${a} ${eq(Prisma.sql`p."groupId"`, p.groupId)} ${eq(Prisma.sql`p."hajjYear"`, p.year)} ${extra}`;
+  const where = Prisma.sql`p.\`agencyId\` = ${a} ${eq(Prisma.sql`p.\`groupId\``, p.groupId)} ${eq(Prisma.sql`p.\`hajjYear\``, p.year)} ${extra}`;
   const db = tenantDb(a);
   const [rows, [agg]] = await Promise.all([
     db.$queryRaw<
@@ -203,11 +203,11 @@ async function pilgrimRows(ctx: ServiceContext, p: ReportParams, all: boolean, e
         phone: string | null;
       }[]
     >`
-      SELECT p.id, p.name, p."passportNo", p."trackingNo", p."preRegNo", p."preRegDate", p."regNo", p."hajjYear" AS year,
-             p.status::text AS status, c.name AS client, g.name AS grp, p.moallem, p.phone
-      FROM "Pilgrim" p JOIN "Client" c ON c.id = p."clientId" LEFT JOIN "Group" g ON g.id = p."groupId"
-      WHERE ${where} ORDER BY g.name NULLS LAST, p.name ${page(p, all)}`,
-    db.$queryRaw<{ n: bigint }[]>`SELECT COUNT(*) AS n FROM "Pilgrim" p WHERE ${where}`,
+      SELECT p.id, p.name, p.\`passportNo\`, p.\`trackingNo\`, p.\`preRegNo\`, p.\`preRegDate\`, p.\`regNo\`, p.\`hajjYear\` AS year,
+             p.status AS status, c.name AS client, g.name AS grp, p.moallem, p.phone
+      FROM \`Pilgrim\` p JOIN \`Client\` c ON c.id = p.\`clientId\` LEFT JOIN \`Group\` g ON g.id = p.\`groupId\`
+      WHERE ${where} ORDER BY g.name IS NULL, g.name, p.name ${page(p, all)}`,
+    db.$queryRaw<{ n: bigint }[]>`SELECT COUNT(*) AS n FROM \`Pilgrim\` p WHERE ${where}`,
   ]);
   return { rows, total: agg?.n ?? 0 };
 }
@@ -255,7 +255,7 @@ export async function preRegistration(
     ctx,
     p,
     all,
-    Prisma.sql`AND p.status::text IN ('PRE_REGISTERED','REGISTERED','TRANSFERRED_IN')`,
+    Prisma.sql`AND p.status IN ('PRE_REGISTERED','REGISTERED','TRANSFERRED_IN')`,
   );
   return {
     key: "pre-registration",

@@ -26,7 +26,7 @@ import { notify } from "../notifications/notificationService";
 export const CHEQUE_CLEAR_SOURCE = "CHEQUE_CLEAR";
 
 async function lockCheque(tx: TenantTx, agencyId: string, id: string) {
-  await tx.$queryRaw`SELECT id FROM "Cheque" WHERE id = ${id} AND "agencyId" = ${agencyId} FOR UPDATE`;
+  await tx.$queryRaw`SELECT id FROM \`Cheque\` WHERE id = ${id} AND \`agencyId\` = ${agencyId} FOR UPDATE`;
   const c = await tx.cheque.findFirst({
     where: { id },
     include: {
@@ -168,10 +168,10 @@ export async function listCheques(ctx: ServiceContext, q: ChequeListQuery) {
   const text = q.q?.trim();
   if (text)
     where.OR = [
-      { chequeNo: { contains: text, mode: "insensitive" } },
-      { bankName: { contains: text, mode: "insensitive" } },
-      { receipt: { number: { contains: text, mode: "insensitive" } } },
-      { vendorPayment: { number: { contains: text, mode: "insensitive" } } },
+      { chequeNo: { contains: text } },
+      { bankName: { contains: text } },
+      { receipt: { number: { contains: text } } },
+      { vendorPayment: { number: { contains: text } } },
     ];
   const [rows, total, counts] = await Promise.all([
     db.cheque.findMany({

@@ -26,9 +26,9 @@ export type AdvanceParty = "CLIENT" | "VENDOR";
 
 /** Locks the party row and returns its name and cached balance. */
 async function lockParty(tx: TenantTx, agencyId: string, party: AdvanceParty, id: string) {
-  const table = party === "CLIENT" ? Prisma.raw('"Client"') : Prisma.raw('"Vendor"');
+  const table = party === "CLIENT" ? Prisma.raw("`Client`") : Prisma.raw("`Vendor`");
   const rows = await tx.$queryRaw<{ id: string; name: string; balance: Prisma.Decimal }[]>`
-    SELECT id, name, balance FROM ${table} WHERE id = ${id} AND "agencyId" = ${agencyId} FOR UPDATE`;
+    SELECT id, name, balance FROM ${table} WHERE id = ${id} AND \`agencyId\` = ${agencyId} FOR UPDATE`;
   const row = rows[0];
   return row ? { ...row, balance: new Prisma.Decimal(row.balance) } : null;
 }
@@ -160,7 +160,7 @@ export async function listAdvanceReturns(
       ...(params.to ? { lte: isoToDate(params.to) } : {}),
     };
   }
-  if (params.q) where.number = { contains: params.q, mode: "insensitive" };
+  if (params.q) where.number = { contains: params.q };
   const [rows, total] = await Promise.all([
     db.advanceReturn.findMany({
       where,

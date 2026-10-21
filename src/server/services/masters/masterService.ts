@@ -63,7 +63,7 @@ function buildWhere(def: MasterDef, q?: string, status: MasterStatusFilter = "ac
   if (status !== "all") where.isActive = status === "active";
   const term = q?.trim();
   if (term) {
-    where.OR = def.searchFields.map((f) => ({ [f]: { contains: term, mode: "insensitive" } }));
+    where.OR = def.searchFields.map((f) => ({ [f]: { contains: term } }));
   }
   return where;
 }

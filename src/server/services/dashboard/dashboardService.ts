@@ -89,22 +89,22 @@ export async function getDashboard(
       }[]
     >`
       SELECT
-        COALESCE(SUM("netTotal" - "refundCredit") FILTER (WHERE date = ${t}), 0) AS st,
-        COALESCE(SUM("netTotal" - "refundCredit") FILTER (WHERE date >= ${d(m0)}), 0) AS sm,
-        COALESCE(SUM("netTotal" - "refundCredit"), 0) AS sy,
-        COALESCE(SUM(discount) FILTER (WHERE date = ${t}), 0) AS dt,
-        COALESCE(SUM(discount) FILTER (WHERE date >= ${d(m0)}), 0) AS dm,
+        COALESCE(SUM(CASE WHEN date = ${t} THEN \`netTotal\` - \`refundCredit\` END), 0) AS st,
+        COALESCE(SUM(CASE WHEN date >= ${d(m0)} THEN \`netTotal\` - \`refundCredit\` END), 0) AS sm,
+        COALESCE(SUM(\`netTotal\` - \`refundCredit\`), 0) AS sy,
+        COALESCE(SUM(CASE WHEN date = ${t} THEN discount END), 0) AS dt,
+        COALESCE(SUM(CASE WHEN date >= ${d(m0)} THEN discount END), 0) AS dm,
         COALESCE(SUM(discount), 0) AS dy
-      FROM "Invoice"
-      WHERE "agencyId" = ${ctx.agencyId} AND status::text IN ${LIVE}
+      FROM \`Invoice\`
+      WHERE \`agencyId\` = ${ctx.agencyId} AND status IN ${LIVE}
         AND date >= ${d(fy.from)} AND date <= ${t}`,
     db.$queryRaw<{ ct: Prisma.Decimal; cm: Prisma.Decimal; cy: Prisma.Decimal }[]>`
       SELECT
-        COALESCE(SUM(amount) FILTER (WHERE date = ${t}), 0) AS ct,
-        COALESCE(SUM(amount) FILTER (WHERE date >= ${d(m0)}), 0) AS cm,
+        COALESCE(SUM(CASE WHEN date = ${t} THEN amount END), 0) AS ct,
+        COALESCE(SUM(CASE WHEN date >= ${d(m0)} THEN amount END), 0) AS cm,
         COALESCE(SUM(amount), 0) AS cy
-      FROM "MoneyReceipt"
-      WHERE "agencyId" = ${ctx.agencyId} AND status = 'POSTED'
+      FROM \`MoneyReceipt\`
+      WHERE \`agencyId\` = ${ctx.agencyId} AND status = 'POSTED'
         AND date >= ${d(fy.from)} AND date <= ${t}`,
   ]);
 
@@ -130,18 +130,18 @@ export async function getDashboard(
     db.$queryRaw<
       { m: string; sales: Prisma.Decimal; cost: Prisma.Decimal; profit: Prisma.Decimal }[]
     >`
-      SELECT to_char(date, 'YYYY-MM') AS m,
-             SUM("netTotal" - "refundCredit") AS sales,
-             SUM("totalCost" - "refundCost") AS cost,
-             SUM(profit - "refundCredit" + "refundCost") AS profit
-      FROM "Invoice"
-      WHERE "agencyId" = ${ctx.agencyId} AND status::text IN ${LIVE}
+      SELECT DATE_FORMAT(date, '%Y-%m') AS m,
+             SUM(\`netTotal\` - \`refundCredit\`) AS sales,
+             SUM(\`totalCost\` - \`refundCost\`) AS cost,
+             SUM(profit - \`refundCredit\` + \`refundCost\`) AS profit
+      FROM \`Invoice\`
+      WHERE \`agencyId\` = ${ctx.agencyId} AND status IN ${LIVE}
         AND date >= ${d(fy.from)} AND date <= ${d(fy.to)}
       GROUP BY m`,
     db.$queryRaw<{ m: string; amount: Prisma.Decimal }[]>`
-      SELECT to_char(date, 'YYYY-MM') AS m, SUM(amount) AS amount
-      FROM "MoneyReceipt"
-      WHERE "agencyId" = ${ctx.agencyId} AND status = 'POSTED'
+      SELECT DATE_FORMAT(date, '%Y-%m') AS m, SUM(amount) AS amount
+      FROM \`MoneyReceipt\`
+      WHERE \`agencyId\` = ${ctx.agencyId} AND status = 'POSTED'
         AND date >= ${d(fy.from)} AND date <= ${d(fy.to)}
       GROUP BY m`,
   ]);

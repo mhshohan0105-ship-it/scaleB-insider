@@ -118,8 +118,10 @@ async function loadLinked(db: Db, id: string, lock = false) {
     throw new ServiceError("Link a client account and a vendor account first (Edit)");
   if (lock) {
     // Serialise set-offs and payments on the two accounts.
-    await (db as TenantTx).$queryRaw`SELECT id FROM "Client" WHERE id = ${c.client.id} FOR UPDATE`;
-    await (db as TenantTx).$queryRaw`SELECT id FROM "Vendor" WHERE id = ${c.vendor.id} FOR UPDATE`;
+    await (db as TenantTx)
+      .$queryRaw`SELECT id FROM \`Client\` WHERE id = ${c.client.id} FOR UPDATE`;
+    await (db as TenantTx)
+      .$queryRaw`SELECT id FROM \`Vendor\` WHERE id = ${c.vendor.id} FOR UPDATE`;
   }
   // Receivable: what the client side owes us. Payable: what we owe the vendor side.
   const receivable = Prisma.Decimal.max(c.client.balance, 0);

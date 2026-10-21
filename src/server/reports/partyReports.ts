@@ -23,10 +23,10 @@ export const PARTY_TYPES: Record<PartyKey, PartyType> = {
 };
 
 const TABLES: Record<PartyKey, string> = {
-  clients: '"Client"',
-  combinedclients: '"CombinedClient"',
-  vendors: '"Vendor"',
-  agents: '"Agent"',
+  clients: "`Client`",
+  combinedclients: "`CombinedClient`",
+  vendors: "`Vendor`",
+  agents: "`Agent`",
 };
 
 const money = (v: Prisma.Decimal | string) => new Prisma.Decimal(v).toFixed(2);
@@ -121,19 +121,19 @@ export async function dueAdvanceReport(
   // Combined clients: own lines plus their linked client and vendor accounts (net).
   const partyJoin =
     p.party === "combinedclients"
-      ? Prisma.sql`((jl."partyType" = 'COMBINED'::"PartyType" AND jl."partyId" = pt.id)
-          OR (jl."partyType" = 'CLIENT'::"PartyType" AND jl."partyId" = pt."clientId")
-          OR (jl."partyType" = 'VENDOR'::"PartyType" AND jl."partyId" = pt."vendorId"))`
-      : Prisma.sql`jl."partyId" = pt.id AND jl."partyType" = ${PARTY_TYPES[p.party]}::"PartyType"`;
+      ? Prisma.sql`((jl.\`partyType\` = 'COMBINED' AND jl.\`partyId\` = pt.id)
+          OR (jl.\`partyType\` = 'CLIENT' AND jl.\`partyId\` = pt.\`clientId\`)
+          OR (jl.\`partyType\` = 'VENDOR' AND jl.\`partyId\` = pt.\`vendorId\`))`
+      : Prisma.sql`jl.\`partyId\` = pt.id AND jl.\`partyType\` = ${PARTY_TYPES[p.party]}`;
   const rows = await tenantDb(ctx.agencyId).$queryRaw<
     { id: string; code: string; name: string; phone: string | null; balance: Prisma.Decimal }[]
   >`
     SELECT pt.id, pt.code, pt.name, pt.phone, SUM(jl.debit - jl.credit) AS balance
     FROM ${table} pt
-    JOIN "JournalLine" jl
-      ON ${partyJoin} AND jl."agencyId" = pt."agencyId"
-    JOIN "JournalEntry" je ON je.id = jl."entryId"
-    WHERE pt."agencyId" = ${ctx.agencyId} AND je.date <= ${sqlDate(asOf)}
+    JOIN \`JournalLine\` jl
+      ON ${partyJoin} AND jl.\`agencyId\` = pt.\`agencyId\`
+    JOIN \`JournalEntry\` je ON je.id = jl.\`entryId\`
+    WHERE pt.\`agencyId\` = ${ctx.agencyId} AND je.date <= ${sqlDate(asOf)}
     GROUP BY pt.id
     HAVING SUM(jl.debit - jl.credit) <> 0
     ORDER BY pt.name`;

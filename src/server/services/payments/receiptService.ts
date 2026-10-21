@@ -56,7 +56,7 @@ export async function dueInvoices(
   });
   if (lock && rows.length) {
     await (tx as TenantTx).$queryRaw`
-      SELECT id FROM "Invoice" WHERE id IN (${Prisma.join(rows.map((r) => r.id))}) ORDER BY id FOR UPDATE`;
+      SELECT id FROM \`Invoice\` WHERE id IN (${Prisma.join(rows.map((r) => r.id))}) ORDER BY id FOR UPDATE`;
   }
   return rows
     .map((r) => ({
@@ -318,10 +318,10 @@ export async function listMoneyReceipts(
   }
   if (params.q) {
     where.OR = [
-      { number: { contains: params.q, mode: "insensitive" } },
-      { reference: { contains: params.q, mode: "insensitive" } },
-      { client: { name: { contains: params.q, mode: "insensitive" } } },
-      { client: { code: { contains: params.q, mode: "insensitive" } } },
+      { number: { contains: params.q } },
+      { reference: { contains: params.q } },
+      { client: { name: { contains: params.q } } },
+      { client: { code: { contains: params.q } } },
     ];
   }
   const [rows, total, sum] = await Promise.all([

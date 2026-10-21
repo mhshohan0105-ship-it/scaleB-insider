@@ -1,7 +1,8 @@
 // Gap-free per agency counters (PLAN.md 2.3). The increment is a single
-// INSERT ... ON CONFLICT DO UPDATE ... RETURNING, so concurrent callers each
-// get a distinct number and the row lock is held until their transaction ends
-// (a rolled back document does not consume a number).
+// INSERT ... ON DUPLICATE KEY UPDATE, so concurrent callers each get a
+// distinct number and the row lock is held until their transaction ends (a
+// rolled back document does not consume a number). LAST_INSERT_ID(expr) hands
+// the new value back on the same connection (the caller's transaction).
 import { randomUUID } from "node:crypto";
 import type { TenantTx } from "@/server/db/tenant";
 
@@ -21,13 +22,13 @@ export async function nextSequence(
   docType: string,
   year = 0,
 ): Promise<number> {
-  const rows = await tx.$queryRaw<{ lastNumber: number }[]>`
-    INSERT INTO "DocumentSequence" ("id", "agencyId", "docType", "year", "lastNumber", "updatedAt")
-    VALUES (${randomUUID()}, ${agencyId}, ${docType}, ${year}, 1, now())
-    ON CONFLICT ("agencyId", "docType", "year")
-    DO UPDATE SET "lastNumber" = "DocumentSequence"."lastNumber" + 1, "updatedAt" = now()
-    RETURNING "lastNumber"`;
-  const n = rows[0]?.lastNumber;
-  if (typeof n !== "number") throw new Error("Sequence increment failed");
+  await tx.$executeRaw`
+    INSERT INTO \`DocumentSequence\` (\`id\`, \`agencyId\`, \`docType\`, \`year\`, \`lastNumber\`, \`updatedAt\`)
+    VALUES (${randomUUID()}, ${agencyId}, ${docType}, ${year}, LAST_INSERT_ID(1), UTC_TIMESTAMP(3))
+    ON DUPLICATE KEY UPDATE
+      \`lastNumber\` = LAST_INSERT_ID(\`lastNumber\` + 1), \`updatedAt\` = UTC_TIMESTAMP(3)`;
+  const rows = await tx.$queryRaw<{ n: bigint | number }[]>`SELECT LAST_INSERT_ID() AS n`;
+  const n = Number(rows[0]?.n);
+  if (!Number.isInteger(n) || n < 1) throw new Error("Sequence increment failed");
   return n;
 }

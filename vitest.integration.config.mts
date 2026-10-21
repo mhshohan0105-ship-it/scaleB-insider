@@ -1,4 +1,4 @@
-// Integration tests: services against a real PostgreSQL test database
+// Integration tests: services against a real MariaDB test database
 // (DATABASE_URL from .env.test). The database is reset once per run.
 import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";

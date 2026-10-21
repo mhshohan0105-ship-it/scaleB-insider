@@ -35,8 +35,8 @@ export async function listPeriods(ctx: ServiceContext): Promise<PeriodRow[]> {
   const [periods, counts] = await Promise.all([
     db.accountingPeriod.findMany({ where: { isClosed: true } }),
     db.$queryRaw<{ m: string; n: bigint }[]>`
-      SELECT to_char(date, 'YYYY-MM') AS m, COUNT(*) AS n FROM "JournalEntry"
-      WHERE "agencyId" = ${ctx.agencyId} GROUP BY m`,
+      SELECT DATE_FORMAT(date, '%Y-%m') AS m, COUNT(*) AS n FROM \`JournalEntry\`
+      WHERE \`agencyId\` = ${ctx.agencyId} GROUP BY m`,
   ]);
   const closed = new Map(periods.map((p) => [`${p.year}-${String(p.month).padStart(2, "0")}`, p]));
   const n = new Map(counts.map((c) => [c.m, Number(c.n)]));

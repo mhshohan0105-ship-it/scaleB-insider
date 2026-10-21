@@ -12,11 +12,11 @@ Travel agency management and accounting SaaS (Next.js full stack). Full spec: `P
 
 ## Stack
 
-Next.js 15 App Router, TypeScript strict, Ant Design v5, Prisma + PostgreSQL, Auth.js v5 (credentials), Zod, Vitest, Playwright, @react-pdf/renderer, exceljs.
+Next.js 15 App Router, TypeScript strict, Ant Design v5, Prisma + MariaDB 10.11 (MySQL provider), Auth.js v5 (credentials), Zod, Vitest, Playwright, @react-pdf/renderer, exceljs.
 
 ## Commands
 
-- Postgres: native PostgreSQL 16 on localhost:5432 (dev machine). `docker compose up -d` is the alternative where Docker is available.
+- Database: MariaDB 10.11 on 127.0.0.1:3307 (Windows service `MariaDB1011`), same version as the cPanel host. The PostgreSQL version of the app lives on branch `postgres`. Raw SQL uses backtick identifiers and exact PascalCase table names (Linux hosts are case sensitive).
 - `npm run dev` dev server
 - `npx prisma migrate dev` / `npx prisma db seed`
 - `npm run check` lint + typecheck + unit tests

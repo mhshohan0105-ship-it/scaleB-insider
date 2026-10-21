@@ -239,9 +239,9 @@ export async function listQuotations(
   const text = params.q?.trim();
   if (text)
     where.OR = [
-      { number: { contains: text, mode: "insensitive" } },
-      { subject: { contains: text, mode: "insensitive" } },
-      { client: { name: { contains: text, mode: "insensitive" } } },
+      { number: { contains: text } },
+      { subject: { contains: text } },
+      { client: { name: { contains: text } } },
     ];
   const [rows, total] = await Promise.all([
     db.quotation.findMany({

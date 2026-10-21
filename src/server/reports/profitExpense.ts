@@ -15,11 +15,11 @@ export async function visaProfit(ctx: ServiceContext, p: ReportParams): Promise<
   const rows = await tenantDb(a).$queryRaw<
     { country: string; visaType: string | null; n: bigint; sales: Dec; cost: Dec; profit: Dec }[]
   >`
-    SELECT v.country, vt.name AS "visaType", COUNT(*) AS n, SUM(v."clientPrice") AS sales,
-           SUM(v."purchasePrice") AS cost, SUM(v.profit) AS profit
-    FROM "InvoiceVisaLine" v JOIN "Invoice" i ON i.id = v."invoiceId"
-    LEFT JOIN "VisaType" vt ON vt.id = v."visaTypeId"
-    WHERE v."agencyId" = ${a} AND i.status::text IN ${LIVE} ${period(Prisma.sql`i.date`, p)}
+    SELECT v.country, vt.name AS \`visaType\`, COUNT(*) AS n, SUM(v.\`clientPrice\`) AS sales,
+           SUM(v.\`purchasePrice\`) AS cost, SUM(v.profit) AS profit
+    FROM \`InvoiceVisaLine\` v JOIN \`Invoice\` i ON i.id = v.\`invoiceId\`
+    LEFT JOIN \`VisaType\` vt ON vt.id = v.\`visaTypeId\`
+    WHERE v.\`agencyId\` = ${a} AND i.status IN ${LIVE} ${period(Prisma.sql`i.date`, p)}
     GROUP BY v.country, vt.name ORDER BY profit DESC`;
   const out = rows.map((r) => ({
     country: r.country,
@@ -53,17 +53,17 @@ export async function groupProfit(ctx: ServiceContext, p: ReportParams): Promise
     { kind: string; name: string; n: bigint; sales: Dec; cost: Dec; profit: Dec }[]
   >`
     SELECT 'Tour group' AS kind, tg.name, COUNT(*) AS n,
-           SUM(i."netTotal" - i."refundCredit") AS sales, SUM(i."totalCost" - i."refundCost") AS cost,
-           SUM(i.profit - i."refundCredit" + i."refundCost") AS profit
-    FROM "Invoice" i JOIN "TourGroup" tg ON tg.id = i."tourGroupId"
-    WHERE i."agencyId" = ${a} AND i.status::text IN ${LIVE} ${period(Prisma.sql`i.date`, p)}
+           SUM(i.\`netTotal\` - i.\`refundCredit\`) AS sales, SUM(i.\`totalCost\` - i.\`refundCost\`) AS cost,
+           SUM(i.profit - i.\`refundCredit\` + i.\`refundCost\`) AS profit
+    FROM \`Invoice\` i JOIN \`TourGroup\` tg ON tg.id = i.\`tourGroupId\`
+    WHERE i.\`agencyId\` = ${a} AND i.status IN ${LIVE} ${period(Prisma.sql`i.date`, p)}
     GROUP BY tg.name
     UNION ALL
-    SELECT initcap(g.type::text) || ' group', g.name, COUNT(*),
-           SUM(i."netTotal" - i."refundCredit"), SUM(i."totalCost" - i."refundCost"),
-           SUM(i.profit - i."refundCredit" + i."refundCost")
-    FROM "Invoice" i JOIN "Group" g ON g.id = i."groupId"
-    WHERE i."agencyId" = ${a} AND i.status::text IN ${LIVE} ${period(Prisma.sql`i.date`, p)}
+    SELECT CONCAT(CONCAT(UPPER(LEFT(g.type, 1)), LOWER(SUBSTRING(g.type, 2))), ' group'), g.name, COUNT(*),
+           SUM(i.\`netTotal\` - i.\`refundCredit\`), SUM(i.\`totalCost\` - i.\`refundCost\`),
+           SUM(i.profit - i.\`refundCredit\` + i.\`refundCost\`)
+    FROM \`Invoice\` i JOIN \`Group\` g ON g.id = i.\`groupId\`
+    WHERE i.\`agencyId\` = ${a} AND i.status IN ${LIVE} ${period(Prisma.sql`i.date`, p)}
     GROUP BY g.type, g.name
     ORDER BY profit DESC`;
   const out = rows.map((r) => ({
@@ -98,8 +98,8 @@ export async function ticketProfit(
   all = false,
 ): Promise<ReportResult> {
   const a = ctx.agencyId;
-  const where = Prisma.sql`t."agencyId" = ${a} AND i.status::text IN ${LIVE} ${period(Prisma.sql`i.date`, p)}
-    ${eq(Prisma.sql`t."airlineId"`, p.airlineId)} ${eq(Prisma.sql`i."clientId"`, p.clientId)}`;
+  const where = Prisma.sql`t.\`agencyId\` = ${a} AND i.status IN ${LIVE} ${period(Prisma.sql`i.date`, p)}
+    ${eq(Prisma.sql`t.\`airlineId\``, p.airlineId)} ${eq(Prisma.sql`i.\`clientId\``, p.clientId)}`;
   const db = tenantDb(a);
   const [rows, [agg]] = await Promise.all([
     db.$queryRaw<
@@ -117,13 +117,13 @@ export async function ticketProfit(
         profit: Dec;
       }[]
     >`
-      SELECT i.id AS "invoiceId", i.type::text AS type, i.number, i.date, t."ticketNo", t."passengerName" AS pax, t.route,
-             al.iata, t."clientPrice" AS sales, t."purchasePrice" AS cost, t.profit
-      FROM "InvoiceAirTicket" t JOIN "Invoice" i ON i.id = t."invoiceId" JOIN "Airline" al ON al.id = t."airlineId"
-      WHERE ${where} ORDER BY i.date, i.number, t."sortOrder" ${page(p, all)}`,
+      SELECT i.id AS \`invoiceId\`, i.type AS type, i.number, i.date, t.\`ticketNo\`, t.\`passengerName\` AS pax, t.route,
+             al.iata, t.\`clientPrice\` AS sales, t.\`purchasePrice\` AS cost, t.profit
+      FROM \`InvoiceAirTicket\` t JOIN \`Invoice\` i ON i.id = t.\`invoiceId\` JOIN \`Airline\` al ON al.id = t.\`airlineId\`
+      WHERE ${where} ORDER BY i.date, i.number, t.\`sortOrder\` ${page(p, all)}`,
     db.$queryRaw<{ n: bigint; sales: Dec; cost: Dec; profit: Dec }[]>`
-      SELECT COUNT(*) AS n, SUM(t."clientPrice") AS sales, SUM(t."purchasePrice") AS cost, SUM(t.profit) AS profit
-      FROM "InvoiceAirTicket" t JOIN "Invoice" i ON i.id = t."invoiceId" WHERE ${where}`,
+      SELECT COUNT(*) AS n, SUM(t.\`clientPrice\`) AS sales, SUM(t.\`purchasePrice\`) AS cost, SUM(t.profit) AS profit
+      FROM \`InvoiceAirTicket\` t JOIN \`Invoice\` i ON i.id = t.\`invoiceId\` WHERE ${where}`,
   ]);
   return {
     key: "ticket-profit",
@@ -164,8 +164,8 @@ export async function expenseHeads(ctx: ServiceContext, p: ReportParams): Promis
   const a = ctx.agencyId;
   const rows = await tenantDb(a).$queryRaw<{ head: string; n: bigint; amount: Dec }[]>`
     SELECT h.name AS head, COUNT(*) AS n, SUM(v.amount) AS amount
-    FROM "Voucher" v JOIN "ExpenseHead" h ON h.id = v."expenseHeadId"
-    WHERE v."agencyId" = ${a} AND v.kind = 'EXPENSE' AND v.status = 'POSTED' ${period(Prisma.sql`v.date`, p)}
+    FROM \`Voucher\` v JOIN \`ExpenseHead\` h ON h.id = v.\`expenseHeadId\`
+    WHERE v.\`agencyId\` = ${a} AND v.kind = 'EXPENSE' AND v.status = 'POSTED' ${period(Prisma.sql`v.date`, p)}
     GROUP BY h.name ORDER BY amount DESC`;
   const out = rows.map((r) => ({ head: r.head, entries: Number(r.n), amount: money(r.amount) }));
   const sum = total(out, "amount");
@@ -207,10 +207,10 @@ export async function salaries(ctx: ServiceContext, p: ReportParams): Promise<Re
       date: Date;
     }[]
   >`
-    SELECT pr.number, pr.month, e.name AS employee, pr.basic, pr."allowanceTotal" AS allowances,
-           pr."deductionTotal" AS deductions, pr."advanceAdjusted" AS advance, pr."netPaid" AS net, pr.date
-    FROM "Payroll" pr JOIN "Employee" e ON e.id = pr."employeeId"
-    WHERE pr."agencyId" = ${a} AND pr.status = 'POSTED' ${period(Prisma.sql`pr.date`, p)}
+    SELECT pr.number, pr.month, e.name AS employee, pr.basic, pr.\`allowanceTotal\` AS allowances,
+           pr.\`deductionTotal\` AS deductions, pr.\`advanceAdjusted\` AS advance, pr.\`netPaid\` AS net, pr.date
+    FROM \`Payroll\` pr JOIN \`Employee\` e ON e.id = pr.\`employeeId\`
+    WHERE pr.\`agencyId\` = ${a} AND pr.status = 'POSTED' ${period(Prisma.sql`pr.date`, p)}
     ORDER BY pr.month, e.name`;
   const out = rows.map((r) => ({
     month: r.month,

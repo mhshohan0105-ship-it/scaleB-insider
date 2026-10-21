@@ -219,10 +219,10 @@ export async function refundableInvoices(ctx: ServiceContext, type: RefundTypeKe
       ...(text
         ? {
             OR: [
-              { number: { contains: text, mode: "insensitive" } },
-              { client: { name: { contains: text, mode: "insensitive" } } },
-              { airTickets: { some: { ticketNo: { contains: text, mode: "insensitive" } } } },
-              { airTickets: { some: { passengerName: { contains: text, mode: "insensitive" } } } },
+              { number: { contains: text } },
+              { client: { name: { contains: text } } },
+              { airTickets: { some: { ticketNo: { contains: text } } } },
+              { airTickets: { some: { passengerName: { contains: text } } } },
             ],
           }
         : {}),
@@ -248,7 +248,7 @@ export async function refundableInvoices(ctx: ServiceContext, type: RefundTypeKe
 
 async function lockClient(tx: TenantTx, agencyId: string, id: string) {
   const rows = await tx.$queryRaw<{ id: string; name: string; balance: Prisma.Decimal }[]>`
-    SELECT id, name, balance FROM "Client" WHERE id = ${id} AND "agencyId" = ${agencyId} FOR UPDATE`;
+    SELECT id, name, balance FROM \`Client\` WHERE id = ${id} AND \`agencyId\` = ${agencyId} FOR UPDATE`;
   const row = rows[0];
   return row ? { ...row, balance: new Prisma.Decimal(row.balance) } : null;
 }
@@ -491,10 +491,10 @@ export async function listRefunds(
   const q = params.q?.trim();
   if (q) {
     where.OR = [
-      { number: { contains: q, mode: "insensitive" } },
-      { client: { name: { contains: q, mode: "insensitive" } } },
-      { invoice: { number: { contains: q, mode: "insensitive" } } },
-      { lines: { some: { description: { contains: q, mode: "insensitive" } } } },
+      { number: { contains: q } },
+      { client: { name: { contains: q } } },
+      { invoice: { number: { contains: q } } },
+      { lines: { some: { description: { contains: q } } } },
     ];
   }
   const [rows, total, sums] = await Promise.all([

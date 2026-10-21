@@ -23,7 +23,7 @@ export async function globalSearch(
   const q = raw.trim();
   if (q.length < 2) return [];
   const db = tenantDb(ctx.agencyId);
-  const text = { contains: q, mode: "insensitive" as const };
+  const text = { contains: q };
   const visibleTypes = (Object.keys(INVOICE_TYPE_INFO) as InvoiceTypeKey[]).filter((t) =>
     can(permissions, INVOICE_TYPE_INFO[t].module, "view"),
   );

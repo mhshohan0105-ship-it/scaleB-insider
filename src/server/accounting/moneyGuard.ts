@@ -25,8 +25,8 @@ export async function lockMoneyAccount(
   id: string,
 ): Promise<LockedAccount | null> {
   const rows = await tx.$queryRaw<LockedAccount[]>`
-    SELECT id, name, kind::text AS kind, balance, "isActive" FROM "MoneyAccount"
-    WHERE id = ${id} AND "agencyId" = ${agencyId} FOR UPDATE`;
+    SELECT id, name, kind AS kind, balance, \`isActive\` FROM \`MoneyAccount\`
+    WHERE id = ${id} AND \`agencyId\` = ${agencyId} FOR UPDATE`;
   const row = rows[0];
   return row ? { ...row, balance: new Prisma.Decimal(row.balance) } : null;
 }

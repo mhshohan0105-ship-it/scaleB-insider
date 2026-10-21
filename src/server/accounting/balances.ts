@@ -35,18 +35,18 @@ export async function checkLedgerIntegrity(
 ): Promise<LedgerIntegrity> {
   const [totals] = await db.$queryRaw<{ d: Prisma.Decimal; c: Prisma.Decimal }[]>`
     SELECT COALESCE(SUM(debit), 0) AS d, COALESCE(SUM(credit), 0) AS c
-    FROM "JournalLine" WHERE "agencyId" = ${agencyId}`;
+    FROM \`JournalLine\` WHERE \`agencyId\` = ${agencyId}`;
 
   const unbalanced = await db.$queryRaw<{ entryId: string }[]>`
-    SELECT "entryId" FROM "JournalLine" WHERE "agencyId" = ${agencyId}
-    GROUP BY "entryId" HAVING SUM(debit) <> SUM(credit)`;
+    SELECT \`entryId\` FROM \`JournalLine\` WHERE \`agencyId\` = ${agencyId}
+    GROUP BY \`entryId\` HAVING SUM(debit) <> SUM(credit)`;
 
   const drift: BalanceDrift[] = [];
   const money = await db.$queryRaw<Row[]>`
     SELECT ma.id, ma.name, ma.balance AS cached, COALESCE(SUM(jl.debit - jl.credit), 0) AS derived
-    FROM "MoneyAccount" ma
-    LEFT JOIN "JournalLine" jl ON jl."moneyAccountId" = ma.id AND jl."agencyId" = ma."agencyId"
-    WHERE ma."agencyId" = ${agencyId}
+    FROM \`MoneyAccount\` ma
+    LEFT JOIN \`JournalLine\` jl ON jl.\`moneyAccountId\` = ma.id AND jl.\`agencyId\` = ma.\`agencyId\`
+    WHERE ma.\`agencyId\` = ${agencyId}
     GROUP BY ma.id
     HAVING ma.balance <> COALESCE(SUM(jl.debit - jl.credit), 0)`;
   drift.push(...money.map((r) => toDrift("MONEY_ACCOUNT", r)));
@@ -54,10 +54,10 @@ export async function checkLedgerIntegrity(
   for (const { kind, table } of PARTY_TABLES) {
     const rows = await db.$queryRaw<Row[]>`
       SELECT p.id, p.name, p.balance AS cached, COALESCE(SUM(jl.debit - jl.credit), 0) AS derived
-      FROM ${Prisma.raw(`"${table}"`)} p
-      LEFT JOIN "JournalLine" jl
-        ON jl."partyId" = p.id AND jl."partyType" = ${kind}::"PartyType" AND jl."agencyId" = p."agencyId"
-      WHERE p."agencyId" = ${agencyId}
+      FROM ${Prisma.raw(`\`${table}\``)} p
+      LEFT JOIN \`JournalLine\` jl
+        ON jl.\`partyId\` = p.id AND jl.\`partyType\` = ${kind} AND jl.\`agencyId\` = p.\`agencyId\`
+      WHERE p.\`agencyId\` = ${agencyId}
       GROUP BY p.id
       HAVING p.balance <> COALESCE(SUM(jl.debit - jl.credit), 0)`;
     drift.push(...rows.map((r) => toDrift(kind, r)));

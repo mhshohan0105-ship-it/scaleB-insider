@@ -1,13 +1,13 @@
 # Deploying scaleB Insider
 
-One Next.js server and one PostgreSQL 16 database. Uploaded files (passport scans, voucher
+One Next.js server and one MariaDB 10.11 (or MySQL 8) database. Uploaded files (passport scans, voucher
 receipts) live in the database, so a database backup is a complete backup.
 
 ## 1. Environment
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `DATABASE_URL` | yes | PostgreSQL connection string |
+| `DATABASE_URL` | yes | `mysql://user:password@host:3306/database` (URL-encode special characters in the password) |
 | `AUTH_SECRET` | yes | Signs session cookies. Generate with `npx auth secret`; changing it signs everyone out |
 | `AUTH_TRUST_HOST` | yes | `true` when running behind a reverse proxy |
 | `APP_URL` | yes | Public URL, e.g. `https://insider.example.com` |
@@ -27,44 +27,49 @@ SMS_SUCCESS_REGEX="\"status\"\s*:\s*\"?(success|ok|202)"
 Numbers are sent as `8801XXXXXXXXX`. Each agency still has to switch SMS on in
 **Configuration → App Config**.
 
-## 2. On Vercel with a Neon database (no server to look after)
+## 2. On cPanel shared hosting (Setup Node.js App + MariaDB)
 
-The repository is ready for Vercel: `vercel.json` pins the Singapore region (`sin1`) and the
-two daily jobs, and the `vercel-build` script runs `prisma generate`, `prisma migrate deploy`
-(over the direct connection) and `next build`.
+Tested target: CloudLinux cPanel with LiteSpeed, "Setup Node.js App" (Node 24) and MariaDB 10.11.
+The host builds nothing (1 GB RAM is too little for `next build`): the app is built on a
+computer and the built files are uploaded.
 
-1. Create a Neon project in **AWS Asia Pacific (Singapore)**.
-2. In Vercel: **Add New → Project**, import the GitHub repository, keep the detected Next.js
-   settings.
-3. Connect the database: in the Vercel project, **Storage → Connect Database → Neon** (or the
-   Neon integration). It adds `DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED` (direct). If
-   you paste the strings by hand instead, set `DATABASE_URL` to the **pooled** string and
-   `DIRECT_URL` to the direct one. The app adds `pgbouncer=true` and a wake-up timeout to a pooled
-   Neon URL by itself.
-4. Add the other variables (Settings → Environment Variables, Production): `AUTH_SECRET`,
-   `AUTH_TRUST_HOST=true`, `APP_URL` (the site address), `CRON_SECRET`, and `SMS_*` if used.
-   Vercel sends `Authorization: Bearer $CRON_SECRET` to the cron routes, which is what they check.
-5. Deploy. The first build creates every table.
-6. From your own computer, create the first agency and the platform admin against the Neon
-   **direct** connection string (section 5), with `DATABASE_URL` set to it in that terminal only.
+1. **Subdomain:** cPanel → Domains → Create A New Domain → `insider.example.com`, untick
+   "Share document root". Run AutoSSL (SSL/TLS Status) for it.
+2. **Database:** cPanel → Manage My Databases: create a database and a user, give the user ALL
+   PRIVILEGES on it. `DATABASE_URL=mysql://USER:PASSWORD@localhost:3306/DBNAME`.
+3. **Tables and the first agency**, either:
+   - from your computer: cPanel → Remote Database Access, add your IP, then with `DATABASE_URL`
+     pointing at the host (`mysql://USER:PASSWORD@<host>:3306/DBNAME`) run
+     `npx prisma migrate deploy` and the commands in section 5; or
+   - in phpMyAdmin: import `prisma/migrations/*/migration.sql` (in order), and create the agency
+     later from your computer the same way.
+4. **Build** on your computer: `npm ci`, then `NEXT_OUTPUT=standalone npm run build`. Copy
+   `.next/static` to `.next/standalone/.next/static`. Upload the contents of
+   `.next/standalone` (zip, File Manager → Upload → Extract) into the app folder, e.g.
+   `/home/USER/insider`. The Prisma client includes the Linux engines (`binaryTargets` in
+   `schema.prisma`).
+5. **Node.js App:** cPanel → Setup Node.js App → Create Application: Node 24, mode Production,
+   application root = the app folder, URL = the subdomain, startup file `server.js`. Add the
+   environment variables from section 1 (and `NODE_ENV=production`, `HOSTNAME=127.0.0.1`).
+   Start the app.
+6. **Scheduled jobs:** cPanel → Cron Jobs, the two `curl` lines of section 6 (server clock may
+   not be UTC: check the time shown on the Cron Jobs page).
 
-Notes: Vercel's Hobby plan is for non-commercial use; a business needs Pro. The cron schedule in
-`vercel.json` is in UTC (19:30 = 01:30 Dhaka, 03:00 = 09:00 Dhaka). Every push to `main`
-redeploys. Database backups: Neon keeps a restore history (length depends on the plan); also
-download the agency backup (Configuration → Database Backup) regularly.
+Updates: build again, upload, then Restart in Setup Node.js App. Apply new migrations first
+(step 3). Backups: cPanel/JetBackup plus Configuration → Database Backup in the app.
 
 ## 3. With Docker
 
 ```bash
-cp .env.example .env        # fill in POSTGRES_PASSWORD, AUTH_SECRET, APP_URL, CRON_SECRET, SMS_*
+cp .env.example .env        # fill in DB_PASSWORD, DB_ROOT_PASSWORD, AUTH_SECRET, APP_URL, CRON_SECRET, SMS_*
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 - The app container runs `prisma migrate deploy` on every start, then the server on port 3000
   (bound to 127.0.0.1). Put Caddy or nginx in front for HTTPS.
-- The `backup` container writes `./backups/scaleb-YYYYMMDD.dump` every night at 02:00 Dhaka time
+- The `backup` container writes `./backups/scaleb-YYYYMMDD.sql.gz` every night at 02:00 Dhaka time
   and keeps 14 days. Copy that folder off the server (rclone, S3 sync, …).
-- Restore: `pg_restore -h <host> -U scaleb -d scaleb_insider --clean scaleb-YYYYMMDD.dump`.
+- Restore: `gunzip -c scaleb-YYYYMMDD.sql.gz | mariadb -h <host> -u scaleb -p scaleb_insider`.
 
 ## 4. Without Docker
 
@@ -75,7 +80,7 @@ NEXT_OUTPUT=standalone npm run build   # self-contained server in .next/standalo
 node .next/standalone/server.js       # copy .next/static into .next/standalone/.next/static first
 ```
 
-Run it under systemd or pm2, and back up with `pg_dump -Fc` on a schedule.
+Run it under systemd or pm2, and back up with `mariadb-dump --single-transaction` on a schedule.
 
 ## 5. First agency and platform admin
 
@@ -113,4 +118,6 @@ Example crontab (server clock in UTC):
 docker compose -f docker-compose.prod.yml up -d --build   # migrations run on start
 ```
 
-Take a manual `pg_dump` before any update that includes new migrations.
+Take a manual `mariadb-dump` before any update that includes new migrations.
+
+The PostgreSQL edition of the app (for Vercel + Neon) is kept on the `postgres` branch.

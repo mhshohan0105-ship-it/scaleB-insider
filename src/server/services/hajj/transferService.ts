@@ -403,10 +403,10 @@ export async function listTransfers(
   const q = params.q?.trim();
   if (q) {
     where.OR = [
-      { number: { contains: q, mode: "insensitive" } },
-      { toLabel: { contains: q, mode: "insensitive" } },
-      { lines: { some: { pilgrim: { name: { contains: q, mode: "insensitive" } } } } },
-      { lines: { some: { pilgrim: { trackingNo: { contains: q, mode: "insensitive" } } } } },
+      { number: { contains: q } },
+      { toLabel: { contains: q } },
+      { lines: { some: { pilgrim: { name: { contains: q } } } } },
+      { lines: { some: { pilgrim: { trackingNo: { contains: q } } } } },
     ];
   }
   const [rows, total] = await Promise.all([

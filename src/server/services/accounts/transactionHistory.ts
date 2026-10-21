@@ -43,25 +43,25 @@ export async function transactionHistory(
 ): Promise<TransactionHistory> {
   const db = tenantDb(ctx.agencyId);
   const account = q.moneyAccountId
-    ? Prisma.sql`AND jl."moneyAccountId" = ${q.moneyAccountId}`
+    ? Prisma.sql`AND jl.\`moneyAccountId\` = ${q.moneyAccountId}`
     : Prisma.empty;
   const filters: Prisma.Sql[] = [];
   if (q.from) filters.push(Prisma.sql`date >= ${sqlDate(q.from)}`);
   if (q.to) filters.push(Prisma.sql`date <= ${sqlDate(q.to)}`);
-  if (q.sourceType) filters.push(Prisma.sql`"sourceType" = ${q.sourceType}`);
+  if (q.sourceType) filters.push(Prisma.sql`\`sourceType\` = ${q.sourceType}`);
   const where = filters.length ? Prisma.sql`WHERE ${Prisma.join(filters, " AND ")}` : Prisma.empty;
 
   const base = Prisma.sql`
     WITH l AS (
-      SELECT jl.id, je.date, je.number, je."sourceType", je.narration, jl.memo,
-             jl.debit, jl.credit, ma.name AS account, je."createdAt",
+      SELECT jl.id, je.date, je.number, je.\`sourceType\`, je.narration, jl.memo,
+             jl.debit, jl.credit, ma.name AS account, je.\`createdAt\`,
              SUM(jl.debit - jl.credit) OVER (
-               PARTITION BY jl."moneyAccountId" ORDER BY je.date, je."createdAt", jl.id
+               PARTITION BY jl.\`moneyAccountId\` ORDER BY je.date, je.\`createdAt\`, jl.id
              ) AS running
-      FROM "JournalLine" jl
-      JOIN "JournalEntry" je ON je.id = jl."entryId"
-      JOIN "MoneyAccount" ma ON ma.id = jl."moneyAccountId"
-      WHERE jl."agencyId" = ${ctx.agencyId} AND jl."moneyAccountId" IS NOT NULL ${account}
+      FROM \`JournalLine\` jl
+      JOIN \`JournalEntry\` je ON je.id = jl.\`entryId\`
+      JOIN \`MoneyAccount\` ma ON ma.id = jl.\`moneyAccountId\`
+      WHERE jl.\`agencyId\` = ${ctx.agencyId} AND jl.\`moneyAccountId\` IS NOT NULL ${account}
     )`;
 
   type Raw = {
@@ -79,7 +79,7 @@ export async function transactionHistory(
   const [rows, [agg]] = await Promise.all([
     db.$queryRaw<Raw[]>`${base}
       SELECT * FROM l ${where}
-      ORDER BY date DESC, "createdAt" DESC, id DESC
+      ORDER BY date DESC, \`createdAt\` DESC, id DESC
       LIMIT ${q.pageSize} OFFSET ${(q.page - 1) * q.pageSize}`,
     db.$queryRaw<
       { n: bigint; debit: Prisma.Decimal | null; credit: Prisma.Decimal | null }[]

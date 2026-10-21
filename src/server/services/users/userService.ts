@@ -49,7 +49,7 @@ export async function listUsers(
   if (params.status !== "all") where.isActive = params.status === "active";
   if (params.q) {
     where.OR = ["name", "username", "email", "phone"].map((f) => ({
-      [f]: { contains: params.q, mode: "insensitive" },
+      [f]: { contains: params.q },
     }));
   }
   const [rows, total] = await Promise.all([

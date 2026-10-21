@@ -11,8 +11,8 @@ import { LIVE, eq, money, page, paging, period, periodLabel, totals } from "./ki
 type Dec = Prisma.Decimal;
 
 function ticketWhere(ctx: ServiceContext, p: ReportParams) {
-  return Prisma.sql`t."agencyId" = ${ctx.agencyId} AND i.status::text IN ${LIVE} ${period(Prisma.sql`i.date`, p)}
-    ${eq(Prisma.sql`t."airlineId"`, p.airlineId)} ${eq(Prisma.sql`i."clientId"`, p.clientId)} ${eq(Prisma.sql`t."vendorId"`, p.vendorId)}`;
+  return Prisma.sql`t.\`agencyId\` = ${ctx.agencyId} AND i.status IN ${LIVE} ${period(Prisma.sql`i.date`, p)}
+    ${eq(Prisma.sql`t.\`airlineId\``, p.airlineId)} ${eq(Prisma.sql`i.\`clientId\``, p.clientId)} ${eq(Prisma.sql`t.\`vendorId\``, p.vendorId)}`;
 }
 
 export async function ticketDetails(
@@ -47,13 +47,13 @@ export async function ticketDetails(
         client: string;
       }[]
     >`
-      SELECT i.id AS "invoiceId", i.type::text AS type, i.number, i.date, t."ticketNo", t.pnr, t."passengerName" AS pax, al.iata,
-             t.route, t."journeyDate" AS journey, t."baseFare" AS base, t."taxTotal" AS tax, t."totalFare" AS fare,
-             t."commissionAmount" AS commission, t."aitAmount" AS ait, t."clientPrice" AS sales, t."purchasePrice" AS cost, t.profit,
+      SELECT i.id AS \`invoiceId\`, i.type AS type, i.number, i.date, t.\`ticketNo\`, t.pnr, t.\`passengerName\` AS pax, al.iata,
+             t.route, t.\`journeyDate\` AS journey, t.\`baseFare\` AS base, t.\`taxTotal\` AS tax, t.\`totalFare\` AS fare,
+             t.\`commissionAmount\` AS commission, t.\`aitAmount\` AS ait, t.\`clientPrice\` AS sales, t.\`purchasePrice\` AS cost, t.profit,
              v.name AS vendor, c.name AS client
-      FROM "InvoiceAirTicket" t JOIN "Invoice" i ON i.id = t."invoiceId" JOIN "Airline" al ON al.id = t."airlineId"
-      JOIN "Vendor" v ON v.id = t."vendorId" JOIN "Client" c ON c.id = i."clientId"
-      WHERE ${where} ORDER BY i.date, i.number, t."sortOrder" ${page(p, all)}`,
+      FROM \`InvoiceAirTicket\` t JOIN \`Invoice\` i ON i.id = t.\`invoiceId\` JOIN \`Airline\` al ON al.id = t.\`airlineId\`
+      JOIN \`Vendor\` v ON v.id = t.\`vendorId\` JOIN \`Client\` c ON c.id = i.\`clientId\`
+      WHERE ${where} ORDER BY i.date, i.number, t.\`sortOrder\` ${page(p, all)}`,
     db.$queryRaw<
       {
         n: bigint;
@@ -67,10 +67,10 @@ export async function ticketDetails(
         profit: Dec;
       }[]
     >`
-      SELECT COUNT(*) AS n, SUM(t."baseFare") AS base, SUM(t."taxTotal") AS tax, SUM(t."totalFare") AS fare,
-             SUM(t."commissionAmount") AS commission, SUM(t."aitAmount") AS ait, SUM(t."clientPrice") AS sales,
-             SUM(t."purchasePrice") AS cost, SUM(t.profit) AS profit
-      FROM "InvoiceAirTicket" t JOIN "Invoice" i ON i.id = t."invoiceId" WHERE ${where}`,
+      SELECT COUNT(*) AS n, SUM(t.\`baseFare\`) AS base, SUM(t.\`taxTotal\`) AS tax, SUM(t.\`totalFare\`) AS fare,
+             SUM(t.\`commissionAmount\`) AS commission, SUM(t.\`aitAmount\`) AS ait, SUM(t.\`clientPrice\`) AS sales,
+             SUM(t.\`purchasePrice\`) AS cost, SUM(t.profit) AS profit
+      FROM \`InvoiceAirTicket\` t JOIN \`Invoice\` i ON i.id = t.\`invoiceId\` WHERE ${where}`,
   ]);
   return {
     key: "ticket-details",
@@ -128,11 +128,14 @@ export async function ticketDetails(
 export async function taxReport(ctx: ServiceContext, p: ReportParams): Promise<ReportResult> {
   const where = ticketWhere(ctx, p);
   const rows = await tenantDb(ctx.agencyId).$queryRaw<{ code: string; n: bigint; amount: Dec }[]>`
-    SELECT upper(x->>'code') AS code, COUNT(*) AS n, SUM((x->>'amount')::numeric) AS amount
-    FROM "InvoiceAirTicket" t JOIN "Invoice" i ON i.id = t."invoiceId",
-         jsonb_array_elements(t.taxes::jsonb) AS x
+    SELECT UPPER(x.code) AS code, COUNT(*) AS n, SUM(x.amount) AS amount
+    FROM \`InvoiceAirTicket\` t JOIN \`Invoice\` i ON i.id = t.\`invoiceId\`,
+         JSON_TABLE(t.taxes, '$[*]' COLUMNS (
+           code VARCHAR(20) PATH '$.code',
+           amount DECIMAL(14,2) PATH '$.amount'
+         )) AS x
     WHERE ${where}
-    GROUP BY upper(x->>'code') ORDER BY amount DESC`;
+    GROUP BY UPPER(x.code) ORDER BY amount DESC`;
   const out = rows.map((r) => ({ code: r.code, tickets: Number(r.n), amount: money(r.amount) }));
   return {
     key: "tax-report",
@@ -155,9 +158,9 @@ async function aitBy(ctx: ServiceContext, p: ReportParams, by: "vendor" | "clien
   return tenantDb(ctx.agencyId).$queryRaw<
     { id: string; name: string; n: bigint; fare: Dec; ait: Dec }[]
   >`
-    SELECT ${idCol} AS id, ${col} AS name, COUNT(*) AS n, SUM(t."totalFare") AS fare, SUM(t."aitAmount") AS ait
-    FROM "InvoiceAirTicket" t JOIN "Invoice" i ON i.id = t."invoiceId"
-    JOIN "Vendor" v ON v.id = t."vendorId" JOIN "Client" c ON c.id = i."clientId"
+    SELECT ${idCol} AS id, ${col} AS name, COUNT(*) AS n, SUM(t.\`totalFare\`) AS fare, SUM(t.\`aitAmount\`) AS ait
+    FROM \`InvoiceAirTicket\` t JOIN \`Invoice\` i ON i.id = t.\`invoiceId\`
+    JOIN \`Vendor\` v ON v.id = t.\`vendorId\` JOIN \`Client\` c ON c.id = i.\`clientId\`
     WHERE ${where} GROUP BY ${idCol}, ${col} ORDER BY ait DESC`;
 }
 
@@ -215,9 +218,9 @@ export async function gdsReport(ctx: ServiceContext, p: ReportParams): Promise<R
   const rows = await tenantDb(ctx.agencyId).$queryRaw<
     { gds: string | null; n: bigint; segments: bigint; fare: Dec; sales: Dec; profit: Dec }[]
   >`
-    SELECT NULLIF(trim(t.gds), '') AS gds, COUNT(*) AS n, SUM(t."segmentCount") AS segments, SUM(t."totalFare") AS fare,
-           SUM(t."clientPrice") AS sales, SUM(t.profit) AS profit
-    FROM "InvoiceAirTicket" t JOIN "Invoice" i ON i.id = t."invoiceId"
+    SELECT NULLIF(trim(t.gds), '') AS gds, COUNT(*) AS n, SUM(t.\`segmentCount\`) AS segments, SUM(t.\`totalFare\`) AS fare,
+           SUM(t.\`clientPrice\`) AS sales, SUM(t.profit) AS profit
+    FROM \`InvoiceAirTicket\` t JOIN \`Invoice\` i ON i.id = t.\`invoiceId\`
     WHERE ${where} GROUP BY NULLIF(trim(t.gds), '') ORDER BY n DESC`;
   const out = rows.map((r) => ({
     gds: r.gds ?? "(not set)",

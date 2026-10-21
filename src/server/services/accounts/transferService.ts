@@ -153,7 +153,7 @@ export async function listBalanceTransfers(
       ...(params.to ? { lte: isoToDate(params.to) } : {}),
     };
   }
-  if (params.q) where.number = { contains: params.q, mode: "insensitive" };
+  if (params.q) where.number = { contains: params.q };
   const [rows, total] = await Promise.all([
     db.balanceTransfer.findMany({
       where,

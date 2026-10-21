@@ -278,10 +278,10 @@ export async function listVouchers(
   const text = q.q?.trim();
   if (text)
     where.OR = [
-      { number: { contains: text, mode: "insensitive" } },
-      { note: { contains: text, mode: "insensitive" } },
-      { reference: { contains: text, mode: "insensitive" } },
-      { title: { contains: text, mode: "insensitive" } },
+      { number: { contains: text } },
+      { note: { contains: text } },
+      { reference: { contains: text } },
+      { title: { contains: text } },
     ];
 
   const [rows, total, sums] = await Promise.all([

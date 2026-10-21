@@ -248,3 +248,20 @@ Acceptance (verified): unit test for the set-off lines (Dr AP vendor / Cr AR cli
 - DEPLOYMENT.md: step by step for Vercel with Neon.
 
 Verified: `npm run check` green (210 unit + 118 integration); the `vercel-build` script builds cleanly against a local database. Not yet verified on Vercel itself.
+
+## Switch to MariaDB / MySQL (2026-10-22)
+
+Decision (owner, 2026-10-21): run on the existing Intelwebhost cPanel hosting, which offers MariaDB 10.11 and Node.js but no PostgreSQL. No production data existed, so the schema starts fresh. The PostgreSQL edition is kept on branch `postgres`.
+
+- Prisma provider `mysql`; one new initial migration (`20261022000000_init_mysql`, 72 tables, utf8mb4). Free-text fields are `TEXT`; keys, indexed and relation fields stay `VARCHAR(191)`. Linux query engines are bundled (`binaryTargets`) so a build made on Windows runs on the host.
+- Case-insensitive search: the database collation (utf8mb4_unicode_ci) already ignores case, so the 66 PostgreSQL-only `mode: "insensitive"` options are gone.
+- Hand-written SQL (24 files) rewritten for MariaDB: backtick identifiers with exact table names (Linux hosts are case sensitive), no `::` casts, `FILTER (WHERE)` as `CASE`, `CONCAT` for `||`, `DATE_FORMAT`, `JSON_TABLE` / `JSON_VALUE`, `IS NULL` ordering, UTC timestamps, Dhaka days via `CONVERT_TZ(..., '+06:00')`.
+- Document numbers: `INSERT … ON DUPLICATE KEY UPDATE` with `LAST_INSERT_ID()`, still gap-free and locked to the saving transaction.
+- Transactions run at READ COMMITTED, as they did on PostgreSQL.
+- Demo seed adds one posted air ticket invoice (`AIT-2026-00001`); the reports browser test no longer depends on data left by another test.
+- Playwright runs 3 browsers at a time (every page is server-rendered; more only queue behind each other on one server).
+- Removed the Neon connection helper and the Vercel build script (they are on the `postgres` branch). Docker files use MariaDB 10.11 and `mariadb-dump`. DEPLOYMENT.md has the cPanel steps.
+
+Verified on MariaDB 10.11.19 (the host's version): `npm run check` green (207 unit + 118 integration); Playwright 28/28 twice; the ledger integrity check is clean on the dev and e2e databases (debits equal credits, no cached balance drift).
+
+Known: report PDFs take about 3.4 seconds for 400 rows (react-pdf layout); Excel exports are fast. Hyphenation, the page total and repeated headers were measured and are not the cause.

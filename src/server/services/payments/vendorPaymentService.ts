@@ -190,9 +190,9 @@ export async function listVendorPayments(
   }
   if (params.q) {
     where.OR = [
-      { number: { contains: params.q, mode: "insensitive" } },
-      { reference: { contains: params.q, mode: "insensitive" } },
-      { vendor: { name: { contains: params.q, mode: "insensitive" } } },
+      { number: { contains: params.q } },
+      { reference: { contains: params.q } },
+      { vendor: { name: { contains: params.q } } },
     ];
   }
   const [rows, total, sum] = await Promise.all([

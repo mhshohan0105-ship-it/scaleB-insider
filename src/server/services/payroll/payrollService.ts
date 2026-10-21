@@ -50,7 +50,7 @@ export async function createPayroll(
     if (!emp)
       throw new ServiceError("Employee not found", { employeeId: "Choose a valid employee" });
     // One payroll per employee per month (locks the employee row).
-    await tx.$queryRaw`SELECT id FROM "Employee" WHERE id = ${emp.id} AND "agencyId" = ${ctx.agencyId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM \`Employee\` WHERE id = ${emp.id} AND \`agencyId\` = ${ctx.agencyId} FOR UPDATE`;
     const dup = await tx.payroll.findFirst({
       where: { employeeId: emp.id, month: data.month, status: "POSTED" },
       select: { number: true },
@@ -154,11 +154,7 @@ export async function listPayrolls(ctx: ServiceContext, q: PayrollListQuery) {
   if (q.month) where.month = q.month;
   if (q.employeeId) where.employeeId = q.employeeId;
   const text = q.q?.trim();
-  if (text)
-    where.OR = [
-      { number: { contains: text, mode: "insensitive" } },
-      { employee: { name: { contains: text, mode: "insensitive" } } },
-    ];
+  if (text) where.OR = [{ number: { contains: text } }, { employee: { name: { contains: text } } }];
   const [rows, total, sums] = await Promise.all([
     db.payroll.findMany({
       where,

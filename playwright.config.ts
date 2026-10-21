@@ -5,7 +5,10 @@ const port = Number(process.env.E2E_PORT ?? 3100);
 
 export default defineConfig({
   testDir: "./e2e",
-  // Long flows run alongside other test files against one server.
+  // Long flows run alongside other test files against one production server.
+  // Every page is rendered on the server (antd styles included), so more than
+  // three browsers at once only queue up behind each other and time out.
+  workers: 3,
   timeout: 120_000,
   expect: { timeout: 10_000 },
   globalSetup: "./e2e/globalSetup.ts",

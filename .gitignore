@@ -1,6 +1,7 @@
 node_modules
 .next
 .next-e2e
+.next-deploy
 out
 .env
 .env.local
@@ -16,3 +17,5 @@ backups
 *.tmp.ts
 *.tmp.tsx
 .claude/settings.local.json
+*.tmp.ps1
+.deploy-upload

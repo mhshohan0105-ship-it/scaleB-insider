@@ -29,34 +29,42 @@ Numbers are sent as `8801XXXXXXXXX`. Each agency still has to switch SMS on in
 
 ## 2. On cPanel shared hosting (Setup Node.js App + MariaDB)
 
-Tested target: CloudLinux cPanel with LiteSpeed, "Setup Node.js App" (Node 24) and MariaDB 10.11.
-The host builds nothing (1 GB RAM is too little for `next build`): the app is built on a
-computer and the built files are uploaded.
+Live at `insider.scalebbd.com` (Intelwebhost: CloudLinux cPanel, LiteSpeed, Node 24, MariaDB 10.11,
+1 GB RAM, server clock on Asia/Dhaka). The host builds nothing; the app is built on a computer and
+the built files are uploaded.
 
-1. **Subdomain:** cPanel → Domains → Create A New Domain → `insider.example.com`, untick
-   "Share document root". Run AutoSSL (SSL/TLS Status) for it.
-2. **Database:** cPanel → Manage My Databases: create a database and a user, give the user ALL
-   PRIVILEGES on it. `DATABASE_URL=mysql://USER:PASSWORD@localhost:3306/DBNAME`.
-3. **Tables and the first agency**, either:
-   - from your computer: cPanel → Remote Database Access, add your IP, then with `DATABASE_URL`
-     pointing at the host (`mysql://USER:PASSWORD@<host>:3306/DBNAME`) run
-     `npx prisma migrate deploy` and the commands in section 5; or
-   - in phpMyAdmin: import `prisma/migrations/*/migration.sql` (in order), and create the agency
-     later from your computer the same way.
-4. **Build** on your computer: `npm ci`, then `NEXT_OUTPUT=standalone npm run build`. Copy
-   `.next/static` to `.next/standalone/.next/static`. Upload the contents of
-   `.next/standalone` (zip, File Manager → Upload → Extract) into the app folder, e.g.
-   `/home/USER/insider`. The Prisma client includes the Linux engines (`binaryTargets` in
-   `schema.prisma`).
-5. **Node.js App:** cPanel → Setup Node.js App → Create Application: Node 24, mode Production,
-   application root = the app folder, URL = the subdomain, startup file `server.js`. Add the
-   environment variables from section 1 (and `NODE_ENV=production`, `HOSTNAME=127.0.0.1`).
-   Start the app.
-6. **Scheduled jobs:** cPanel → Cron Jobs, the two `curl` lines of section 6 (server clock may
-   not be UTC: check the time shown on the Cron Jobs page).
+1. **Subdomain:** Domains → Create A New Domain, untick "Share document root". The account's
+   wildcard certificate (`*.scalebbd.com`) already covers it.
+2. **Database:** Manage My Databases → database + user (ALL PRIVILEGES). The MySQL port is closed
+   to the outside, so Remote Database Access does not help: tables are created by import.
+3. **Tables (first install only):** in phpMyAdmin import the new migration SQL plus the
+   `_prisma_migrations` row and the data of a local staging database (tables in their exact
+   PascalCase names; Windows MariaDB lower-cases them, so take the DDL from the migration file).
+   Create the agency in that staging database first with `scripts/create-agency.ts`.
+4. **Build** on the computer: `NEXT_OUTPUT=standalone NEXT_DIST_DIR=.next-deploy npx next build`,
+   copy `.next-deploy/static` into `.next-deploy/standalone/.next-deploy/static`, **delete
+   `.next-deploy/standalone/.env`** (the build copies the local one), drop `*win32*` and
+   `*windows.dll.node`. Upload in zips under 10 MB into `/home/USER/insider-app` and extract.
+5. **Node.js App:** Node 24, Production, root `insider-app`, URL the subdomain, startup
+   `server.js`. Environment variables:
+   - `DATABASE_URL=mysql://USER:PASSWORD@localhost:3306/DBNAME`, `AUTH_SECRET`, `CRON_SECRET`
+     (secrets: typed by the owner),
+   - `AUTH_TRUST_HOST=true`, `APP_URL` and `AUTH_URL` = `https://insider.example.com` (without
+     `AUTH_URL` redirects point at the internal `0.0.0.0:3000`),
+   - `PRISMA_QUERY_ENGINE_LIBRARY=/home/USER/insider-app/node_modules/.prisma/client/libquery_engine-rhel-openssl-1.1.x.so.node`
+     (Prisma misdetects this CloudLinux as debian-openssl-1.1.x; both targets are now built).
+   Click **Save**, then **Restart**. Errors go to `insider-app/stderr.log`.
+   If pages come back empty (200 with no body) or static files give 503 while `/api/auth/session`
+   works, old `next-server` processes are still serving (Resource Usage shows memory near 1 GB
+   even with the app stopped; Stop/Restart does not end them). End them with a one-off cron line
+   `pkill -u USER -f next-server`, remove the line after a minute, then Start the app.
+6. **Scheduled jobs:** Cron Jobs, server clock is Dhaka time:
+   `30 1 * * *` ledger check and `0 9 * * *` daily, each
+   `curl -fsS -H "Authorization: Bearer CRON_SECRET" https://insider.example.com/api/cron/<job> > /dev/null 2>&1`.
 
-Updates: build again, upload, then Restart in Setup Node.js App. Apply new migrations first
-(step 3). Backups: cPanel/JetBackup plus Configuration → Database Backup in the app.
+**Updates:** build again (step 4), upload and extract over the old files, apply any new migration
+SQL in phpMyAdmin first, then Restart. Backups: JetBackup in cPanel plus Configuration → Database
+Backup in the app.
 
 ## 3. With Docker
 

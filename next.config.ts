@@ -24,6 +24,11 @@ const nextConfig: NextConfig = {
   ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" as const } : {}),
   poweredByHeader: false,
   serverExternalPackages: ["bcryptjs", "@react-pdf/renderer", "exceljs"],
+  // pdfkit loads its built-in fonts (Helvetica…) by computed paths, which file
+  // tracing cannot see; without this the standalone build has no PDF fonts.
+  outputFileTracingIncludes: {
+    "/**": ["./node_modules/pdfkit/js/standard-fonts/**", "./node_modules/pdfkit/js/data/**"],
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

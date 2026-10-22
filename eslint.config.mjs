@@ -9,6 +9,8 @@ const config = [
     ignores: [
       ".next/**",
       ".next-e2e/**",
+      ".next-deploy/**",
+      ".deploy-upload/**",
       "node_modules/**",
       "playwright-report/**",
       "test-results/**",

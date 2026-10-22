@@ -52,7 +52,12 @@ the built files are uploaded.
    - `AUTH_TRUST_HOST=true`, `APP_URL` and `AUTH_URL` = `https://insider.example.com` (without
      `AUTH_URL` redirects point at the internal `0.0.0.0:3000`),
    - `PRISMA_QUERY_ENGINE_LIBRARY=/home/USER/insider-app/node_modules/.prisma/client/libquery_engine-rhel-openssl-1.1.x.so.node`
-     (Prisma misdetects this CloudLinux as debian-openssl-1.1.x; both targets are now built).
+     (Prisma misdetects this CloudLinux as debian-openssl-1.1.x; both targets are now built),
+   - `TOKIO_WORKER_THREADS=2` and `UV_THREADPOOL_SIZE=2`: the account may run 100 processes and
+     threads in all, and Prisma's engine otherwise starts one thread per server core; past the
+     limit it panics ("OS can't spawn worker thread"), which shows as 503 or a client-side error.
+   - The password inside `DATABASE_URL` must be URL-encoded (`@` → `%40`, `#` → `%23`); simplest
+     is a database password of letters and digits only.
    Click **Save**, then **Restart**. Errors go to `insider-app/stderr.log`.
    If pages come back empty (200 with no body) or static files give 503 while `/api/auth/session`
    works, old `next-server` processes are still serving (Resource Usage shows memory near 1 GB

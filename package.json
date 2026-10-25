@@ -25,6 +25,7 @@
     "@ant-design/icons": "^5.6.1",
     "@ant-design/nextjs-registry": "~1.2.0",
     "@ant-design/v5-patch-for-react-19": "^1.0.3",
+    "@fontsource-variable/inter": "^5.2.5",
     "@prisma/client": "^6.19.3",
     "@react-pdf/renderer": "^4.9.0",
     "antd": "^5.29.3",

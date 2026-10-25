@@ -278,3 +278,10 @@ Decision (owner, 2026-10-25): a full backup every night at 02:00 Dhaka time, kep
 - New platform tables `BackupRun` and `BackupConfig` (migration `20261025100018_backups`).
 
 Verified: `npm run check` green (217 unit + 122 integration). The integration test restores a dump into an empty database and every table's `CHECKSUM TABLE` matches; the file opens only with its key. A manual backup from the page works locally and the script decrypts it.
+
+## New look: design tokens and app shell (2026-10-25)
+
+Owner approved the redesign mock-ups (Air ticket and Visa forms, invoice list, refund wizard, invoice PDF) on 2026-10-25.
+
+- One set of design tokens (`THEME` in `src/components/Providers.tsx`): teal accent `#0f6b5c`, warm greys, status colours that differ in lightness; Inter (self-hosted by next/font) with Noto Sans Bengali fallback; 8/12 px radii, 38 px controls; tabular figures in tables.
+- Shell: darker sidebar with the agency name under the logo, wider search with Ctrl+K, a "+ New" menu of every create page the user's role allows, initials avatar.

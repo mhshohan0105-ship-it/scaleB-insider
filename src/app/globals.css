@@ -8,7 +8,14 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: #f3f6f6;
+  background: #f3f6f5;
+}
+
+/* Money and counts line up in columns everywhere. */
+.ant-table,
+.ant-statistic-content,
+.ant-input-number-input {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Login */
@@ -26,7 +33,7 @@ body {
   color: #e6f4f1;
   background:
     radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.08), transparent 40%),
-    linear-gradient(150deg, #0f2a2e 0%, #0e7c6b 100%);
+    linear-gradient(150deg, #0c3b34 0%, #0f6b5c 100%);
 }
 
 .login-brand h1 {
@@ -83,7 +90,7 @@ body {
 
 /* App shell */
 .shell-logo {
-  height: 56px;
+  height: 64px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -95,22 +102,47 @@ body {
   overflow: hidden;
 }
 
+.shell-logo-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.shell-logo-agency {
+  font-size: 12px;
+  font-weight: 400;
+  color: #9fbdb6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .shell-logo-mark {
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
-  border-radius: 8px;
-  background: #e6f4f1;
-  color: #0f2a2e;
-  font-size: 13px;
+  background: #e6f2ef;
+  color: #0c3b34;
+  font-size: 14px;
   font-weight: 700;
 }
 
 .shell-sider-scroll {
-  height: calc(100vh - 56px);
+  height: calc(100vh - 64px);
   overflow-y: auto;
+  padding-bottom: 16px;
+}
+
+.shell-kbd {
+  font-size: 11px;
+  color: #4a5a56;
+  border: 1px solid #d5dfdc;
+  border-radius: 4px;
+  padding: 0 5px;
+  line-height: 18px;
 }
 
 .shell-header {
@@ -119,8 +151,8 @@ body {
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 16px;
-  border-bottom: 1px solid #e5eaea;
+  gap: 12px;
+  border-bottom: 1px solid #e3e9e7;
 }
 
 .shell-header-spacer {
@@ -128,8 +160,21 @@ body {
 }
 
 .shell-content {
-  padding: 20px;
+  padding: 24px 28px 40px;
   min-height: calc(100vh - 64px);
+  max-width: 1520px;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .shell-content {
+    padding: 16px;
+  }
+}
+
+/* Cards: soft border, no heavy shadow. */
+.ant-card {
+  border-color: #e3e9e7;
 }
 
 /* Invoice line rows are dense; the "(optional)" hint would wrap the labels. */

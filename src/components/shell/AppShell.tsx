@@ -22,10 +22,12 @@ import {
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  PlusOutlined,
   SearchOutlined,
   UserOutlined,
 } from "@ant-design/icons";
 import { navEntries, type NavModule } from "@/lib/nav";
+import { THEME } from "@/components/Providers";
 import { FALLBACK_ICON, NAV_ICONS } from "./navIcons";
 import { LiveClock } from "./LiveClock";
 import { NotificationBell } from "./NotificationBell";
@@ -56,6 +58,19 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
   const [search, setSearch] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const searchSeq = useRef(0);
+  const searchBox = useRef<HTMLInputElement>(null);
+
+  // Ctrl+K (Cmd+K) jumps to the search box from anywhere.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchBox.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Records (invoices, tickets, clients, ...) matching the search, debounced.
   useEffect(() => {
@@ -73,6 +88,23 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
   }, [search]);
 
   const entries = useMemo(() => navEntries(nav), [nav]);
+
+  // "+ New": every create page the user's role can open, grouped by module.
+  const createMenu: MenuProps["items"] = useMemo(() => {
+    const groups = new Map<string, { key: string; label: ReactNode }[]>();
+    for (const e of entries) {
+      if (!e.leaf.href.endsWith("/new")) continue;
+      const label = e.leaf.label.replace(/^New\s+/, "").replace(/: Create$/, "");
+      const list = groups.get(e.module.label) ?? [];
+      list.push({ key: e.leaf.href, label: <Link href={e.leaf.href}>{label}</Link> });
+      groups.set(e.module.label, list);
+    }
+    return [...groups].map(([group, children]) =>
+      children.length === 1
+        ? { key: children[0]!.key, label: <Link href={children[0]!.key}>{group}</Link> }
+        : { key: group, label: group, children },
+    );
+  }, [entries]);
 
   const menuItems: MenuProps["items"] = useMemo(
     () =>
@@ -195,7 +227,12 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
       >
         <div className="shell-logo">
           <span className="shell-logo-mark">sB</span>
-          {!collapsed && <span>scaleB Insider</span>}
+          {!collapsed && (
+            <span className="shell-logo-text">
+              <span>scaleB Insider</span>
+              <span className="shell-logo-agency">{user.agencyName}</span>
+            </span>
+          )}
         </div>
         <div className="shell-sider-scroll">
           <Menu
@@ -219,7 +256,7 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
             onClick={() => setCollapsed(!collapsed)}
           />
           <AutoComplete
-            style={{ width: 340, maxWidth: "40vw" }}
+            style={{ width: 420, maxWidth: "42vw" }}
             options={searchOptions}
             value={search}
             onChange={setSearch}
@@ -229,14 +266,25 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
             }}
           >
             <Input
-              prefix={<SearchOutlined />}
-              placeholder="Search pages, invoices, tickets, clients…"
+              ref={(el) => {
+                searchBox.current = el?.input ?? null;
+              }}
+              prefix={<SearchOutlined style={{ color: THEME.muted }} />}
+              suffix={<span className="shell-kbd">Ctrl K</span>}
+              placeholder="Search invoice, ticket, client, passport…"
               allowClear
               aria-label="Search"
             />
           </AutoComplete>
 
           <div className="shell-header-spacer" />
+          {createMenu && createMenu.length > 0 && (
+            <Dropdown menu={{ items: createMenu }} trigger={["click"]} placement="bottomRight">
+              <Button type="primary" icon={<PlusOutlined />}>
+                New
+              </Button>
+            </Dropdown>
+          )}
           <LiveClock />
           <NotificationBell />
           <Dropdown menu={{ items: userMenu }} trigger={["click"]} placement="bottomRight">
@@ -244,8 +292,8 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
               type="text"
               style={{ height: 48, display: "flex", alignItems: "center", gap: 8 }}
             >
-              <Avatar size="small" style={{ background: "#0e7c6b" }}>
-                {user.name.slice(0, 1).toUpperCase()}
+              <Avatar style={{ background: THEME.brand, fontWeight: 600 }}>
+                {initials(user.name)}
               </Avatar>
               <span style={{ textAlign: "left", lineHeight: 1.2 }}>
                 <div>{user.name}</div>
@@ -271,4 +319,15 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
       </Layout>
     </Layout>
   );
+}
+
+/** "Md. Karim Hossain" -> "KH" (titles like Md. are skipped). */
+function initials(name: string): string {
+  const words = name
+    .split(/\s+/)
+    .filter((w) => w && !/^(md|mohammad|mohammed|mst|mrs?|ms|dr)\.?$/i.test(w));
+  const pick = words.length ? words : name.split(/\s+/);
+  const first = pick[0]?.[0] ?? "";
+  const last = pick.length > 1 ? (pick[pick.length - 1]?.[0] ?? "") : "";
+  return (first + last).toUpperCase() || "?";
 }

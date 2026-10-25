@@ -13,7 +13,7 @@ test-results
 coverage
 
 # Local-only files
-backups
+/backups/
 *.tmp.ts
 *.tmp.tsx
 .claude/settings.local.json

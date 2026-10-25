@@ -6,7 +6,11 @@ import { Prisma } from "@prisma/client";
 import { calcAirTicket, type FareBase } from "@/lib/calc/airTicket";
 import { d, round2, sum } from "@/lib/calc/money";
 import { dateToIso, isoToDate } from "@/lib/dates";
-import { airInvoiceSchema, nonCommissionInvoiceSchema } from "@/lib/schemas/invoices";
+import {
+  airInvoiceSchema,
+  nonCommissionInvoiceSchema,
+  type FlightSegment,
+} from "@/lib/schemas/invoices";
 import { tenantDb, type TenantTx } from "@/server/db/tenant";
 import type { ServiceContext } from "../context";
 import { NotFoundError, ServiceError } from "../errors";
@@ -103,10 +107,13 @@ function ticketRows(tickets: ParsedTicket[], settings: AirPricingSettings | null
     segmentCount: t.route.split("-").length - 1,
     journeyDate: isoToDate(t.journeyDate),
     returnDate: t.returnDate ? isoToDate(t.returnDate) : null,
+    issueDate: t.issueDate ? isoToDate(t.issueDate) : null,
     cabinClass: t.cabinClass ?? null,
+    segments: t.segments,
     baseFare: new Prisma.Decimal(t.baseFare),
     taxes: t.taxes,
     clientPrice: new Prisma.Decimal(t.clientPrice),
+    extraFee: new Prisma.Decimal(t.extraFee),
     ...priceTicket(t, settings),
   }));
 }
@@ -262,6 +269,10 @@ export async function getAirInvoice(
     refundCredit: money(inv.refundCredit),
     due: money(inv.netTotal.minus(inv.refundCredit).minus(inv.paidAmount)),
     note: inv.note,
+    reference: inv.reference,
+    showPrevDue: inv.showPrevDue,
+    showDiscount: inv.showDiscount,
+    showExtraFee: inv.showExtraFee,
     voidReason: inv.voidReason,
     tickets: inv.airTickets.map((t) => ({
       id: t.id,
@@ -279,7 +290,9 @@ export async function getAirInvoice(
       route: t.route,
       journeyDate: dateToIso(t.journeyDate),
       returnDate: t.returnDate ? dateToIso(t.returnDate) : null,
+      issueDate: t.issueDate ? dateToIso(t.issueDate) : null,
       cabinClass: t.cabinClass,
+      segments: (t.segments as FlightSegment[]) ?? [],
       baseFare: money(t.baseFare),
       taxes: (t.taxes as { code: string; amount: string }[]) ?? [],
       taxTotal: money(t.taxTotal),
@@ -288,6 +301,7 @@ export async function getAirInvoice(
       commissionAmount: money(t.commissionAmount),
       aitAmount: money(t.aitAmount),
       clientPrice: money(t.clientPrice),
+      extraFee: money(t.extraFee),
       purchasePrice: money(t.purchasePrice),
       profit: money(t.profit),
     })),
@@ -313,6 +327,10 @@ export function toFormValues(inv: AirInvoiceView) {
     serviceCharge: inv.serviceCharge,
     vat: inv.vat,
     note: inv.note,
+    reference: inv.reference,
+    showPrevDue: inv.showPrevDue,
+    showDiscount: inv.showDiscount,
+    showExtraFee: inv.showExtraFee,
     tickets: inv.tickets.map((t) => ({
       ticketNo: t.ticketNo,
       pnr: t.pnr,
@@ -326,7 +344,10 @@ export function toFormValues(inv: AirInvoiceView) {
       route: t.route,
       journeyDate: t.journeyDate,
       returnDate: t.returnDate,
+      issueDate: t.issueDate,
       cabinClass: t.cabinClass,
+      segments: t.segments,
+      extraFee: t.extraFee,
       baseFare: t.baseFare,
       taxes: t.taxes,
       commissionPercent: t.commissionPercent,

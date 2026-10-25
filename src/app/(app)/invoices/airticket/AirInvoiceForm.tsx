@@ -34,6 +34,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { PartySelect } from "@/components/PartySelect";
 import { applyActionResult } from "@/components/formResult";
 import { INVOICE_TYPE_INFO } from "@/lib/invoiceTypes";
+import { ClientField } from "@/components/invoices/ClientField";
 import { createInvoiceAction, updateInvoiceAction } from "../invoiceActions";
 
 interface TicketForm {
@@ -269,16 +270,8 @@ export function AirInvoiceForm(props: Props) {
         scrollToFirstError
       >
         <Card title="Invoice" style={{ marginBottom: 16 }}>
+          <ClientField formName="airInvoice" invoiceType={type} />
           <Row gutter={16}>
-            <Col xs={24} md={12} xl={8}>
-              <Form.Item
-                label="Client"
-                name="clientId"
-                rules={[{ required: true, message: "Choose a client" }]}
-              >
-                <PartySelect party="clients" id="airInvoice_clientId" />
-              </Form.Item>
-            </Col>
             <Col xs={12} md={6} xl={4}>
               <Form.Item
                 label="Invoice date"

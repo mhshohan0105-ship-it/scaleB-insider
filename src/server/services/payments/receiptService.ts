@@ -13,6 +13,7 @@ import { allocationErrors, autoAllocate, type DueInvoice } from "@/lib/calc/allo
 import { dateToIso, isoToDate } from "@/lib/dates";
 import type { ListParams } from "@/lib/listParams";
 import { voidSchema } from "@/lib/schemas/accounts";
+import type { z } from "zod";
 import { moneyReceiptSchema } from "@/lib/schemas/invoices";
 import { systemAccounts } from "@/server/accounting/ledgers";
 import { assertCanPayOut, requireActiveAccount } from "@/server/accounting/moneyGuard";
@@ -86,116 +87,125 @@ export async function createMoneyReceipt(
   input: unknown,
 ): Promise<{ id: string; number: string }> {
   const data = moneyReceiptSchema.parse(input);
+  return tenantDb(ctx.agencyId).$transaction((tx) => writeMoneyReceipt(tx, ctx, data));
+}
+
+/**
+ * Writes a money receipt inside the caller's transaction (also used when an
+ * invoice is saved with "Receive payment now").
+ */
+export async function writeMoneyReceipt(
+  tx: TenantTx,
+  ctx: ServiceContext,
+  data: z.output<typeof moneyReceiptSchema>,
+): Promise<{ id: string; number: string }> {
   const amount = new Prisma.Decimal(data.amount);
   const charge = new Prisma.Decimal(data.transactionCharge);
+  const client = await tx.client.findFirst({
+    where: { id: data.clientId },
+    select: { id: true, name: true },
+  });
+  if (!client) throw new ServiceError("Client not found", { clientId: "Choose a valid client" });
+  const account = await requireActiveAccount(tx, ctx.agencyId, data.moneyAccountId);
 
-  return tenantDb(ctx.agencyId).$transaction(async (tx) => {
-    const client = await tx.client.findFirst({
-      where: { id: data.clientId },
-      select: { id: true, name: true },
-    });
-    if (!client) throw new ServiceError("Client not found", { clientId: "Choose a valid client" });
-    const account = await requireActiveAccount(tx, ctx.agencyId, data.moneyAccountId);
+  // Lock the client's due invoices so two receipts cannot over-pay the same one.
+  const dues = await dueInvoices(tx, client.id, true);
+  let allocations: { invoiceId: string; amount: Prisma.Decimal }[];
+  if (data.allocations) {
+    const errors = allocationErrors(amount.toString(), data.allocations, dues);
+    if (errors.length) throw new ServiceError(errors[0]!, { allocations: errors.join("; ") });
+    allocations = data.allocations.map((a) => ({
+      invoiceId: a.invoiceId,
+      amount: new Prisma.Decimal(a.amount),
+    }));
+  } else {
+    allocations = autoAllocate(amount.toString(), dues).allocations.map((a) => ({
+      invoiceId: a.invoiceId,
+      amount: new Prisma.Decimal(a.amount.toFixed(2)),
+    }));
+  }
 
-    // Lock the client's due invoices so two receipts cannot over-pay the same one.
-    const dues = await dueInvoices(tx, client.id, true);
-    let allocations: { invoiceId: string; amount: Prisma.Decimal }[];
-    if (data.allocations) {
-      const errors = allocationErrors(amount.toString(), data.allocations, dues);
-      if (errors.length) throw new ServiceError(errors[0]!, { allocations: errors.join("; ") });
-      allocations = data.allocations.map((a) => ({
-        invoiceId: a.invoiceId,
-        amount: new Prisma.Decimal(a.amount),
-      }));
-    } else {
-      allocations = autoAllocate(amount.toString(), dues).allocations.map((a) => ({
-        invoiceId: a.invoiceId,
-        amount: new Prisma.Decimal(a.amount.toFixed(2)),
-      }));
-    }
-
-    const number = await documentNumber(tx, ctx, "MONEY_RECEIPT", data.date);
-    const receipt = await tx.moneyReceipt.create({
+  const number = await documentNumber(tx, ctx, "MONEY_RECEIPT", data.date);
+  const receipt = await tx.moneyReceipt.create({
+    data: {
+      agencyId: ctx.agencyId,
+      number,
+      clientId: client.id,
+      date: isoToDate(data.date),
+      amount,
+      moneyAccountId: account.id,
+      paymentMethod: data.paymentMethod,
+      transactionCharge: charge,
+      reference: data.reference ?? null,
+      note: data.note ?? null,
+      createdById: ctx.userId,
+    },
+  });
+  for (const a of allocations) {
+    await tx.moneyReceiptAllocation.create({
       data: {
         agencyId: ctx.agencyId,
-        number,
-        clientId: client.id,
-        date: isoToDate(data.date),
+        receiptId: receipt.id,
+        invoiceId: a.invoiceId,
+        amount: a.amount,
+      },
+    });
+    await applyPayment(tx, a.invoiceId, a.amount);
+  }
+
+  const cheque = data.paymentMethod === "CHEQUE" ? data.cheque : null;
+  if (cheque) {
+    await tx.cheque.create({
+      data: {
+        agencyId: ctx.agencyId,
+        direction: "RECEIVED",
+        chequeNo: cheque.chequeNo,
+        bankName: cheque.bankName,
+        chequeDate: isoToDate(cheque.chequeDate),
         amount,
+        partyType: "CLIENT",
+        partyId: client.id,
+        receiptId: receipt.id,
         moneyAccountId: account.id,
-        paymentMethod: data.paymentMethod,
-        transactionCharge: charge,
-        reference: data.reference ?? null,
-        note: data.note ?? null,
+        history: chequeHistory([], "PENDING", ctx.userId, `With receipt ${number}`),
         createdById: ctx.userId,
       },
     });
-    for (const a of allocations) {
-      await tx.moneyReceiptAllocation.create({
-        data: {
-          agencyId: ctx.agencyId,
-          receiptId: receipt.id,
-          invoiceId: a.invoiceId,
-          amount: a.amount,
-        },
-      });
-      await applyPayment(tx, a.invoiceId, a.amount);
-    }
-
-    const cheque = data.paymentMethod === "CHEQUE" ? data.cheque : null;
-    if (cheque) {
-      await tx.cheque.create({
-        data: {
-          agencyId: ctx.agencyId,
-          direction: "RECEIVED",
-          chequeNo: cheque.chequeNo,
-          bankName: cheque.bankName,
-          chequeDate: isoToDate(cheque.chequeDate),
-          amount,
-          partyType: "CLIENT",
-          partyId: client.id,
-          receiptId: receipt.id,
-          moneyAccountId: account.id,
-          history: chequeHistory([], "PENDING", ctx.userId, `With receipt ${number}`),
-          createdById: ctx.userId,
-        },
-      });
-    }
-    const lines: LineInput[] = [
-      cheque
-        ? {
-            ledgerAccountId: (await systemAccounts(tx, ["CHEQUES_IN_HAND"] as const))
-              .CHEQUES_IN_HAND,
-            debit: amount,
-            memo: `Cheque ${cheque.chequeNo}`,
-          }
-        : { moneyAccountId: account.id, debit: amount.minus(charge), memo: data.reference ?? null },
-      {
-        ledgerAccountId: (await systemAccounts(tx, ["AR"] as const)).AR,
-        credit: amount,
-        partyType: "CLIENT",
-        partyId: client.id,
-      },
-    ];
-    if (charge.greaterThan(0)) {
-      const { TRANSACTION_CHARGE } = await systemAccounts(tx, ["TRANSACTION_CHARGE"] as const);
-      lines.push({ ledgerAccountId: TRANSACTION_CHARGE, debit: charge, memo: "Collection charge" });
-    }
-    await postEntry(tx, ctx, {
-      date: data.date,
-      sourceType: RECEIPT_SOURCE,
-      sourceId: receipt.id,
-      narration: `Money receipt ${number} from ${client.name}`,
-      lines,
-    });
-    await recordAudit(tx, ctx, {
-      action: "CREATE",
-      entity: "MoneyReceipt",
-      entityId: receipt.id,
-      after: { ...receipt, allocations },
-    });
-    return { id: receipt.id, number };
+  }
+  const lines: LineInput[] = [
+    cheque
+      ? {
+          ledgerAccountId: (await systemAccounts(tx, ["CHEQUES_IN_HAND"] as const))
+            .CHEQUES_IN_HAND,
+          debit: amount,
+          memo: `Cheque ${cheque.chequeNo}`,
+        }
+      : { moneyAccountId: account.id, debit: amount.minus(charge), memo: data.reference ?? null },
+    {
+      ledgerAccountId: (await systemAccounts(tx, ["AR"] as const)).AR,
+      credit: amount,
+      partyType: "CLIENT",
+      partyId: client.id,
+    },
+  ];
+  if (charge.greaterThan(0)) {
+    const { TRANSACTION_CHARGE } = await systemAccounts(tx, ["TRANSACTION_CHARGE"] as const);
+    lines.push({ ledgerAccountId: TRANSACTION_CHARGE, debit: charge, memo: "Collection charge" });
+  }
+  await postEntry(tx, ctx, {
+    date: data.date,
+    sourceType: RECEIPT_SOURCE,
+    sourceId: receipt.id,
+    narration: `Money receipt ${number} from ${client.name}`,
+    lines,
   });
+  await recordAudit(tx, ctx, {
+    action: "CREATE",
+    entity: "MoneyReceipt",
+    entityId: receipt.id,
+    after: { ...receipt, allocations },
+  });
+  return { id: receipt.id, number };
 }
 
 /** Adds (or with a negative amount removes) a payment on an invoice and refreshes its status. */

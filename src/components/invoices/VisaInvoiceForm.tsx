@@ -180,7 +180,7 @@ export function VisaInvoiceForm({
             : { date: dayjs(today), lines: [{}] }
         }
       >
-        <InvoiceHeaderCard formName="visaInvoice" employees={employees} />
+        <InvoiceHeaderCard formName="visaInvoice" invoiceType="VISA" employees={employees} />
 
         <Card title="Passengers" style={{ marginBottom: 16 }}>
           <Form.List name="lines">

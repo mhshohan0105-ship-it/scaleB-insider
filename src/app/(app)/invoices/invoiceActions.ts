@@ -12,6 +12,7 @@ import {
   updateAirInvoice,
 } from "@/server/services/invoices/airInvoiceService";
 import { voidInvoice } from "@/server/services/invoices/invoiceCommon";
+import { clientSnapshot } from "@/server/services/parties/quickClient";
 import {
   createItemInvoice,
   isItemInvoiceType,
@@ -94,5 +95,13 @@ export async function reissuableTicketsAction(clientId: string) {
   return runAction(async () => {
     const ctx = await requirePermission("reissue", "create");
     return reissuableTickets(ctx, clientId);
+  });
+}
+
+/** The chosen client's balance, shown on the invoice form's summary. */
+export async function clientSnapshotAction(type: string, clientId: string) {
+  return runAction(async () => {
+    const ctx = await requirePermission(INVOICE_TYPE_INFO[typeOf(type)].module, "view");
+    return clientSnapshot(ctx, clientId);
   });
 }

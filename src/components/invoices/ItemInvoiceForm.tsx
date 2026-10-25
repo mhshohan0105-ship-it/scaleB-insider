@@ -335,6 +335,7 @@ export function ItemInvoiceForm({
       >
         <InvoiceHeaderCard
           formName="itemInvoice"
+          invoiceType={type}
           employees={options.employees}
           extra={headerExtra}
         />

@@ -52,6 +52,37 @@ export const taxLineSchema = z.object({
   amount: moneyField("Tax amount"),
 });
 
+const timeText = z.preprocess(
+  blankToNull,
+  z
+    .string()
+    .trim()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Time as HH:MM")
+    .nullable()
+    .optional(),
+);
+
+/** One flight leg, printed on the invoice. */
+export const flightSegmentSchema = z.object({
+  from: z
+    .string({ error: "From is required" })
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z]{3}$/, "Airport code, e.g. DAC"),
+  to: z
+    .string({ error: "To is required" })
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z]{3}$/, "Airport code, e.g. DXB"),
+  airline: optionalText(3),
+  flightNo: optionalText(10),
+  date: optionalDate("Flight date"),
+  departs: timeText,
+  arrives: timeText,
+});
+
+export type FlightSegment = z.output<typeof flightSegmentSchema>;
+
 // Ticket fields shared by air ticket and non commission invoices.
 const ticketFields = {
   ticketNo: z
@@ -78,9 +109,13 @@ const ticketFields = {
     .regex(/^[A-Z]{3}(-[A-Z]{3})+$/, "Route: airport codes like DAC-DXB-DAC"),
   journeyDate: businessDate("Journey date"),
   returnDate: optionalDate("Return date"),
+  issueDate: optionalDate("Issue date"),
   cabinClass: optionalText(20),
   taxes: z.array(taxLineSchema).max(20).default([]),
+  segments: z.array(flightSegmentSchema).max(12).default([]),
   clientPrice: moneyField("Client price").refine(positive, "Client price must be more than 0"),
+  /** Part of the client price shown as a separate fee on the invoice. */
+  extraFee: optionalMoney("Extra fee"),
 };
 
 const returnAfterJourney = {
@@ -89,13 +124,20 @@ const returnAfterJourney = {
   issue: { path: ["returnDate"], message: "Return date is before the journey date" },
 };
 
+const feeWithinPrice = {
+  check: (t: { extraFee: string; clientPrice: string }) =>
+    new Decimal(t.extraFee).lessThanOrEqualTo(t.clientPrice),
+  issue: { path: ["extraFee"], message: "The extra fee is part of the client price; it cannot be larger" },
+};
+
 export const airTicketLineSchema = z
   .object({
     ...ticketFields,
     baseFare: moneyField("Base fare").refine(positive, "Base fare must be more than 0"),
     commissionPercent: percentField("Commission %"),
   })
-  .refine(returnAfterJourney.check, returnAfterJourney.issue);
+  .refine(returnAfterJourney.check, returnAfterJourney.issue)
+  .refine(feeWithinPrice.check, feeWithinPrice.issue);
 
 export type AirTicketLineInput = z.input<typeof airTicketLineSchema>;
 
@@ -106,12 +148,42 @@ export const nonCommissionTicketSchema = z
     baseFare: optionalMoney("Base fare"),
     purchasePrice: moneyField("Purchase price"),
   })
-  .refine(returnAfterJourney.check, returnAfterJourney.issue);
+  .refine(returnAfterJourney.check, returnAfterJourney.issue)
+  .refine(feeWithinPrice.check, feeWithinPrice.issue);
 
 // ─── Invoice header shared by every invoice type ─────────────────────────────
 
+/** A client created together with the invoice ("New client" on the form). */
+export const newClientSchema = z.object({
+  name: z.string({ error: "Client name is required" }).trim().min(2, "Client name is required").max(120),
+  phone: z
+    .string({ error: "Mobile number is required" })
+    .trim()
+    .regex(/^(\+?88)?01[3-9]\d{8}$/, "Mobile number like 01XXXXXXXXX"),
+  email: z.preprocess(blankToNull, z.string().trim().email("Enter a valid email").max(120).nullable().optional()),
+  address: optionalText(300),
+  type: z.enum(["INDIVIDUAL", "CORPORATE"]).default("INDIVIDUAL"),
+});
+
+export type NewClientInput = z.input<typeof newClientSchema>;
+
+/** Money received with the invoice: becomes a money receipt on this invoice. */
+export const invoicePaymentSchema = z.object({
+  moneyAccountId: z.string({ error: "Choose the account" }).min(1, "Choose the account"),
+  paymentMethod: z.enum(["CASH", "BANK", "MOBILE", "CARD"], { error: "Choose how it was paid" }),
+  amount: moneyField("Amount").refine(positive, "Amount must be more than 0"),
+  date: optionalDate("Payment date"),
+  reference: optionalText(80),
+});
+
 export const invoiceHeaderFields = {
-  clientId: z.string({ error: "Choose a client" }).min(1, "Choose a client"),
+  clientId: z.preprocess(blankToNull, z.string().max(40).nullable().optional()),
+  newClient: newClientSchema.nullable().optional(),
+  reference: optionalText(100),
+  showPrevDue: z.boolean().default(false),
+  showDiscount: z.boolean().default(true),
+  showExtraFee: z.boolean().default(false),
+  payment: invoicePaymentSchema.nullable().optional(),
   date: businessDate("Invoice date"),
   dueDate: optionalDate("Due date"),
   salesmanId: optionalId,
@@ -131,6 +203,10 @@ export const invoiceHeaderFields = {
 };
 
 type HeaderValues = {
+  clientId?: string | null;
+  newClient?: unknown;
+  payment?: unknown;
+  post: boolean;
   date: string;
   dueDate?: string | null;
   agentId?: string | null;
@@ -140,6 +216,16 @@ type HeaderValues = {
 };
 
 function headerChecks(v: HeaderValues, ctx: z.RefinementCtx) {
+  if (!v.clientId && !v.newClient) {
+    ctx.addIssue({ code: "custom", path: ["clientId"], message: "Choose a client" });
+  }
+  if (v.payment && !v.post) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["payment", "amount"],
+      message: "A draft cannot take a payment; save and post it",
+    });
+  }
   if (v.dueDate && v.dueDate < v.date) {
     ctx.addIssue({
       code: "custom",
@@ -349,6 +435,9 @@ export const reissueLineSchema = z
 export const reissueInvoiceSchema = z
   .object({
     ...invoiceHeaderFields,
+    // A reissue belongs to the client of the original ticket.
+    clientId: z.string({ error: "Choose a client" }).min(1, "Choose a client"),
+    newClient: z.null().optional(),
     lines: z.array(reissueLineSchema).min(1, "Add at least one ticket").max(50),
   })
   .superRefine((v, ctx) => {

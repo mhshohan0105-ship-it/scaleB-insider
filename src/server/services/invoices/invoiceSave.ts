@@ -2,20 +2,36 @@
 // costs per vendor, how to write them); this module does the rest: header
 // checks, totals, numbering, draft vs post, reverse + repost on edit, audit.
 import { Prisma, type InvoiceType } from "@prisma/client";
+import type { z } from "zod";
 import { calcInvoiceTotals } from "@/lib/calc/invoiceTotals";
 import { isoToDate } from "@/lib/dates";
 import { INVOICE_TYPE_INFO } from "@/lib/invoiceTypes";
+import {
+  moneyReceiptSchema,
+  type invoicePaymentSchema,
+  type newClientSchema,
+} from "@/lib/schemas/invoices";
 import { recordAudit } from "@/server/audit/audit";
 import { tenantDb, type TenantTx } from "@/server/db/tenant";
 import type { ServiceContext } from "../context";
 import { NotFoundError, ServiceError } from "../errors";
 import { documentNumber } from "../numbering/documentNumber";
 import { lockInvoice, postInvoice, repostInvoice, statusAfterPayment } from "./invoiceCommon";
+import { createClientInTx } from "../parties/quickClient";
+import { writeMoneyReceipt } from "../payments/receiptService";
 import { newPublicToken } from "./publicInvoice";
 
 /** Header fields as parsed by `invoiceHeaderFields` (src/lib/schemas/invoices.ts). */
 export interface InvoiceHeaderInput {
-  clientId: string;
+  /** Existing client, or null with `newClient` to create one with the invoice. */
+  clientId?: string | null;
+  newClient?: z.output<typeof newClientSchema> | null;
+  reference?: string | null;
+  showPrevDue?: boolean;
+  showDiscount?: boolean;
+  showExtraFee?: boolean;
+  /** Money received with the invoice (create and post only). */
+  payment?: z.output<typeof invoicePaymentSchema> | null;
   date: string;
   dueDate?: string | null;
   salesmanId?: string | null;
@@ -46,7 +62,14 @@ export interface PreparedLines {
 
 export type PrepareLines = (tx: TenantTx, invoiceId: string | null) => Promise<PreparedLines>;
 
-async function assertHeaderRefs(tx: TenantTx, h: InvoiceHeaderInput) {
+/** The invoice's client: the chosen one, or a new client created in this transaction. */
+async function resolveClient(tx: TenantTx, ctx: ServiceContext, h: InvoiceHeaderInput) {
+  if (h.clientId) return h.clientId;
+  if (h.newClient) return createClientInTx(tx, ctx, h.newClient);
+  throw new ServiceError("Choose a client", { clientId: "Choose a client" });
+}
+
+async function assertHeaderRefs(tx: TenantTx, h: InvoiceHeaderInput & { clientId: string }) {
   const checks: [string | null | undefined, () => Promise<unknown>, string, string][] = [
     [
       h.clientId,
@@ -85,7 +108,7 @@ async function assertHeaderRefs(tx: TenantTx, h: InvoiceHeaderInput) {
   }
 }
 
-function header(h: InvoiceHeaderInput, lines: PreparedLines) {
+function header(h: InvoiceHeaderInput & { clientId: string }, lines: PreparedLines) {
   const totals = calcInvoiceTotals({
     lines: lines.totals,
     discount: h.discount,
@@ -117,6 +140,10 @@ function header(h: InvoiceHeaderInput, lines: PreparedLines) {
     agentCommission: dec(totals.agentCommission),
     profit: dec(totals.profit),
     note: h.note ?? null,
+    reference: h.reference ?? null,
+    showPrevDue: h.showPrevDue ?? false,
+    showDiscount: h.showDiscount ?? true,
+    showExtraFee: h.showExtraFee ?? false,
   };
 }
 
@@ -127,9 +154,10 @@ export async function createInvoice(
   prepare: PrepareLines,
 ): Promise<{ id: string; number: string }> {
   return tenantDb(ctx.agencyId).$transaction(async (tx) => {
-    await assertHeaderRefs(tx, h);
+    const withClient = { ...h, clientId: await resolveClient(tx, ctx, h) };
+    await assertHeaderRefs(tx, withClient);
     const lines = await prepare(tx, null);
-    const data = header(h, lines);
+    const data = header(withClient, lines);
     const number = await documentNumber(tx, ctx, INVOICE_TYPE_INFO[type].docType, h.date);
     const invoice = await tx.invoice.create({
       data: {
@@ -152,6 +180,27 @@ export async function createInvoice(
       entityId: invoice.id,
       after: { ...invoice, lines: lines.audit },
     });
+    if (h.payment) {
+      if (!h.post) throw new ServiceError("A draft cannot take a payment; save and post it");
+      if (new Prisma.Decimal(h.payment.amount).greaterThan(data.netTotal))
+        throw new ServiceError("The payment is more than the invoice total", {
+          "payment.amount": `At most ${data.netTotal.toFixed(2)}`,
+        });
+      await writeMoneyReceipt(
+        tx,
+        ctx,
+        moneyReceiptSchema.parse({
+          clientId: withClient.clientId,
+          date: h.payment.date ?? h.date,
+          moneyAccountId: h.payment.moneyAccountId,
+          paymentMethod: h.payment.paymentMethod,
+          amount: h.payment.amount,
+          reference: h.payment.reference ?? null,
+          note: `With invoice ${number}`,
+          allocations: [{ invoiceId: invoice.id, amount: h.payment.amount }],
+        }),
+      );
+    }
     return { id: invoice.id, number };
   });
 }
@@ -178,14 +227,17 @@ export async function updateInvoice(
     if (await tx.refund.count({ where: { invoiceId: id, status: "POSTED" } })) {
       throw new ServiceError("This invoice has refunds. Void the refunds before editing it.");
     }
-    if (before.clientId !== h.clientId && before.paidAmount.greaterThan(0)) {
+    if (h.payment)
+      throw new ServiceError("Take payments for a saved invoice from Money receipts");
+    const withClient = { ...h, clientId: await resolveClient(tx, ctx, h) };
+    if (before.clientId !== withClient.clientId && before.paidAmount.greaterThan(0)) {
       throw new ServiceError("The client cannot change once money has been received", {
         clientId: "Locked",
       });
     }
-    await assertHeaderRefs(tx, h);
+    await assertHeaderRefs(tx, withClient);
     const lines = await prepare(tx, id);
-    const data = header(h, lines);
+    const data = header(withClient, lines);
     if (data.netTotal.lessThan(before.paidAmount)) {
       throw new ServiceError(
         `${before.paidAmount.toFixed(2)} has already been received; the invoice total cannot be lower than that`,

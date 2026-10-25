@@ -5,30 +5,27 @@ import { Card, Col, DatePicker, Form, Row, Select } from "antd";
 import type { FieldOption } from "@/lib/masters";
 import { MoneyInput } from "@/components/MoneyInput";
 import { PartySelect } from "@/components/PartySelect";
+import { ClientField } from "./ClientField";
 
 /** Client, dates, salesperson and agent fields shared by the invoice forms. */
 export function InvoiceHeaderCard({
   formName,
+  invoiceType,
+  allowNewClient = true,
   employees,
   extra,
 }: {
   formName: string;
+  invoiceType: string;
+  allowNewClient?: boolean;
   employees: FieldOption[];
   /** Type specific header fields (tour group, travel dates, ...). */
   extra?: ReactNode;
 }) {
   return (
     <Card title="Invoice" style={{ marginBottom: 16 }}>
+      <ClientField formName={formName} invoiceType={invoiceType} allowNew={allowNewClient} />
       <Row gutter={16}>
-        <Col xs={24} md={12} xl={8}>
-          <Form.Item
-            label="Client"
-            name="clientId"
-            rules={[{ required: true, message: "Choose a client" }]}
-          >
-            <PartySelect party="clients" id={`${formName}_clientId`} />
-          </Form.Item>
-        </Col>
         <Col xs={12} md={6} xl={4}>
           <Form.Item
             label="Invoice date"

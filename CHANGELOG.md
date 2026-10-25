@@ -294,3 +294,12 @@ Owner approved the redesign mock-ups (Air ticket and Visa forms, invoice list, r
 - New dependency `qrcode` (MIT). Migration `20261025120000_branding` (table names written in their exact case for the Linux host).
 
 Verified: `npm run check` green (217 unit + 127 integration, 5 new for branding and the public check). Locally: logo upload shows on the profile, the PDF renders with logo, QR and DUE stamp, the QR page shows the invoice on a phone-sized screen and "Not found" for a wrong code.
+
+## New client and payment from the invoice form (2026-10-25)
+
+- Every invoice form (air ticket, non commission, visa, other, other package, tour, umrah, hajj) has **Existing client / New client**. A new client (name, mobile, type, email, address) is created inside the invoice's transaction, so a failed invoice leaves no client behind; a mobile number already used by a client is refused with that client's name and code. Reissues keep the original ticket's client. The chosen client's balance shows next to the picker.
+- Invoice header gains a reference, print choices (previous due, discount, extra fee) and an optional payment received with the invoice, written as a money receipt allocated to it in the same transaction (posted invoices only, not above the total).
+- Air tickets gain issue date, extra fee (part of the client price, shown separately when chosen) and flight segments.
+- `writeMoneyReceipt` lets other services write a receipt inside their own transaction.
+
+Verified: `npm run check` green (218 unit + 133 integration, 6 new), Playwright 28/28.

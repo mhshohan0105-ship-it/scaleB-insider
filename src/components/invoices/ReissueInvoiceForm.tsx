@@ -233,7 +233,12 @@ export function ReissueInvoiceForm({
             : { date: dayjs(today), clientId: presetClient ?? null, lines: [{}] }
         }
       >
-        <InvoiceHeaderCard formName="reissueInvoice" employees={employees} />
+        <InvoiceHeaderCard
+          formName="reissueInvoice"
+          invoiceType="REISSUE"
+          allowNewClient={false}
+          employees={employees}
+        />
 
         <Card title="Tickets" style={{ marginBottom: 16 }}>
           {clientId && !loading && tickets.length === 0 && (

@@ -285,3 +285,12 @@ Owner approved the redesign mock-ups (Air ticket and Visa forms, invoice list, r
 
 - One set of design tokens (`THEME` in `src/components/Providers.tsx`): teal accent `#0f6b5c`, warm greys, status colours that differ in lightness; Inter (self-hosted by next/font) with Noto Sans Bengali fallback; 8/12 px radii, 38 px controls; tabular figures in tables.
 - Shell: darker sidebar with the agency name under the logo, wider search with Ctrl+K, a "+ New" menu of every create page the user's role allows, initials avatar.
+
+## Agency branding, QR verification and the new invoice PDF (2026-10-25)
+
+- Agency Profile: upload a **logo** and a **seal / signature** image (PNG or JPG, up to 1 MB, checked by their bytes, stored in the database so backups include them), a Facebook page, and **Printed documents** switches: QR code, PAID / DUE / PARTIAL stamp, passengers table, "Powered by scaleB Insider". Each agency sees only its own images.
+- Invoice PDF in the approved layout: logo and agency details with the QR code, INVOICE title, bill-to and invoice details (with sold by), passengers & passports table, billing lines, totals box with amount in words, status stamp, seal above the authorised signature, footer with page numbers.
+- Every invoice gets a random verification token (`Invoice.publicToken`; older invoices get one when first printed). The QR opens `/verify/<token>`, a public page (no sign-in) that shows only the agency, invoice number, date, total, paid, due and status; drafts and suspended agencies are not shown.
+- New dependency `qrcode` (MIT). Migration `20261025120000_branding` (table names written in their exact case for the Linux host).
+
+Verified: `npm run check` green (217 unit + 127 integration, 5 new for branding and the public check). Locally: logo upload shows on the profile, the PDF renders with logo, QR and DUE stamp, the QR page shows the invoice on a phone-sized screen and "Not found" for a wrong code.

@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { INVOICE_TYPE_INFO, type InvoiceTypeKey } from "@/lib/invoiceTypes";
 import { can } from "@/lib/permissions";
 import { getUserContext, toServiceContext } from "@/server/auth/session";
+import { invoiceBranding } from "@/server/pdf/branding";
 import { InvoicePdf } from "@/server/pdf/InvoicePdf";
 import {
   itemDocument,
@@ -62,11 +63,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     getAppConfig(ctx),
   ]);
   if (!invoice) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const branding = await invoiceBranding(ctx, agency, id, invoice.status);
 
   const pdf = await renderToBuffer(
     createElement(InvoicePdf, {
       invoice,
       agency,
+      branding,
       terms: config.invoiceTerms,
       footer: config.invoiceFooter,
     }) as never,

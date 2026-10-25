@@ -18,6 +18,12 @@ export interface PdfColumn {
   right?: boolean;
 }
 
+export interface PdfPassenger {
+  name: string;
+  type: string | null;
+  passport: string | null;
+}
+
 export interface PdfInvoice {
   number: string;
   status: string;
@@ -37,6 +43,9 @@ export interface PdfInvoice {
   paidAmount: string;
   due: string;
   note: string | null;
+  soldBy: string | null;
+  /** One row per distinct passenger (name + passport) across the lines. */
+  passengers: PdfPassenger[];
 }
 
 type Common = Pick<
@@ -56,8 +65,11 @@ type Common = Pick<
   | "note"
 >;
 
-function common(inv: Common): Common {
+type CommonIn = Common & { salesman?: { name: string } | null };
+
+function common(inv: CommonIn): Common & { soldBy: string | null } {
   return {
+    soldBy: inv.salesman?.name ?? null,
     number: inv.number,
     status: inv.status,
     date: inv.date,
@@ -74,6 +86,19 @@ function common(inv: Common): Common {
   };
 }
 
+function passengers(list: { name: string | null; type?: string | null; passport?: string | null }[]) {
+  const seen = new Set<string>();
+  const out: PdfPassenger[] = [];
+  for (const p of list) {
+    if (!p.name) continue;
+    const key = `${p.name.toUpperCase()}|${p.passport ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ name: p.name, type: p.type ?? null, passport: p.passport ?? null });
+  }
+  return out;
+}
+
 const join = (...parts: (string | null | undefined)[]) => parts.filter(Boolean).join(" · ");
 const amountCol: PdfColumn = { label: "Amount (BDT)", flex: 1.2, right: true };
 
@@ -83,6 +108,9 @@ export function ticketDocument(inv: AirInvoiceView): PdfInvoice {
     typeLabel: INVOICE_TYPE_INFO[inv.type as InvoiceTypeKey].label,
     extraMeta: [],
     linesLabel: "Tickets",
+    passengers: passengers(
+      inv.tickets.map((t) => ({ name: t.passengerName, type: t.passengerType, passport: t.passportNo })),
+    ),
     columns: [
       { label: "Passenger", flex: 2.2 },
       { label: "Ticket / PNR", flex: 1.6 },
@@ -120,6 +148,7 @@ export function itemDocument(inv: ItemInvoiceView): PdfInvoice {
     typeLabel: INVOICE_TYPE_INFO[inv.type as InvoiceTypeKey].label,
     extraMeta,
     linesLabel: "Services",
+    passengers: passengers(inv.items.map((it) => ({ name: it.passengerName, passport: it.passportNo }))),
     columns: [
       { label: "Description", flex: 3.4 },
       { label: "Date", flex: 1.2 },
@@ -157,6 +186,7 @@ export function visaDocument(inv: VisaInvoiceView): PdfInvoice {
     typeLabel: "Visa",
     extraMeta: [],
     linesLabel: "Visas",
+    passengers: passengers(inv.lines.map((l) => ({ name: l.passengerName, passport: l.passportNo }))),
     columns: [
       { label: "Passenger", flex: 2.4 },
       { label: "Country", flex: 1.6 },
@@ -181,6 +211,7 @@ export function reissueDocument(inv: ReissueInvoiceView): PdfInvoice {
     typeLabel: "Reissue",
     extraMeta: [],
     linesLabel: "Reissues",
+    passengers: passengers(inv.lines.map((l) => ({ name: l.passengerName }))),
     columns: [
       { label: "Passenger", flex: 2 },
       { label: "Ticket", flex: 1.8 },

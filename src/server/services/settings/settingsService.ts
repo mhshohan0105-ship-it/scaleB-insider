@@ -85,6 +85,13 @@ export async function saveAppConfig(ctx: ServiceContext, input: unknown): Promis
   });
 }
 
+export interface PdfOptions {
+  showQr: boolean;
+  showStamp: boolean;
+  showPassports: boolean;
+  showPoweredBy: boolean;
+}
+
 export type AgencyProfile = {
   code: string;
   name: string;
@@ -92,13 +99,23 @@ export type AgencyProfile = {
   phone: string | null;
   email: string | null;
   website: string | null;
+  facebook: string | null;
   tradeLicense: string | null;
   iataNo: string | null;
-  logoUrl: string | null;
+  /** Uploaded images: kind -> last change (ISO), for cache-busting their URLs. */
+  images: { LOGO: string | null; SEAL: string | null };
+  pdf: PdfOptions;
 };
 
 export async function getProfile(ctx: ServiceContext): Promise<AgencyProfile> {
-  const a = await loadAgency(ctx.agencyId);
+  const db = tenantDb(ctx.agencyId);
+  const [a, setting, images] = await Promise.all([
+    loadAgency(ctx.agencyId),
+    db.agencySetting.findFirst(),
+    db.agencyImage.findMany({ select: { kind: true, updatedAt: true } }),
+  ]);
+  const changed = (kind: string) =>
+    images.find((i) => i.kind === kind)?.updatedAt.toISOString() ?? null;
   return {
     code: a.code,
     name: a.name,
@@ -106,9 +123,16 @@ export async function getProfile(ctx: ServiceContext): Promise<AgencyProfile> {
     phone: a.phone,
     email: a.email,
     website: a.website,
+    facebook: a.facebook,
     tradeLicense: a.tradeLicense,
     iataNo: a.iataNo,
-    logoUrl: a.logoUrl,
+    images: { LOGO: changed("LOGO"), SEAL: changed("SEAL") },
+    pdf: {
+      showQr: setting?.pdfShowQr ?? true,
+      showStamp: setting?.pdfShowStamp ?? true,
+      showPassports: setting?.pdfShowPassports ?? true,
+      showPoweredBy: setting?.pdfShowPoweredBy ?? true,
+    },
   };
 }
 
@@ -126,9 +150,18 @@ export async function saveProfile(ctx: ServiceContext, input: unknown): Promise<
         website: data.website ?? null,
         tradeLicense: data.tradeLicense ?? null,
         iataNo: data.iataNo ?? null,
-        logoUrl: data.logoUrl ?? null,
+        facebook: data.facebook ?? null,
       },
     });
+    const pdf = {
+      pdfShowQr: data.pdf.showQr,
+      pdfShowStamp: data.pdf.showStamp,
+      pdfShowPassports: data.pdf.showPassports,
+      pdfShowPoweredBy: data.pdf.showPoweredBy,
+    };
+    const setting = await tx.agencySetting.findFirst({ select: { id: true } });
+    if (setting) await tx.agencySetting.update({ where: { id: setting.id }, data: pdf });
+    else await tx.agencySetting.create({ data: { agencyId: ctx.agencyId, ...pdf } });
     await recordAudit(tx, ctx, {
       action: "UPDATE",
       entity: "Agency",

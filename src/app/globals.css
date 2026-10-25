@@ -181,3 +181,81 @@ body {
 .line-row .ant-form-item .ant-form-item-label > label .ant-form-item-optional {
   display: none;
 }
+
+/* Public invoice check (QR code) */
+.verify-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  color: #18211f;
+}
+
+.verify-card {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border: 1px solid #e3e9e7;
+  border-radius: 16px;
+  padding: 28px 24px;
+}
+
+.verify-card h1 {
+  font-size: 20px;
+  margin: 12px 0 4px;
+}
+
+.verify-card dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  margin: 20px 0;
+  font-size: 15px;
+}
+
+.verify-card dt {
+  color: #4a5a56;
+}
+
+.verify-card dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.verify-muted {
+  color: #4a5a56;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.verify-ok,
+.verify-bad,
+.verify-status {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.verify-ok {
+  background: #ecfdf3;
+  color: #067647;
+}
+
+.verify-bad {
+  background: #fef3f2;
+  color: #b42318;
+}
+
+.verify-foot {
+  margin: 20px 0 0;
+  font-size: 12px;
+  color: #4a5a56;
+  text-align: center;
+}

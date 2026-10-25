@@ -3,8 +3,8 @@ import { StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { ReactNode } from "react";
 import type { AgencyProfile } from "@/server/services/settings/settingsService";
 
-export const BRAND = "#0e7c6b";
-export const MUTED = "#6b7280";
+export const BRAND = "#0f6b5c";
+export const MUTED = "#4a5a56";
 
 export const styles = StyleSheet.create({
   page: { padding: 36, fontSize: 9.5, fontFamily: "Helvetica", color: "#111827" },

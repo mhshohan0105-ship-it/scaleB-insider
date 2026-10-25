@@ -11,6 +11,7 @@ import type { ServiceContext } from "../context";
 import { NotFoundError, ServiceError } from "../errors";
 import { documentNumber } from "../numbering/documentNumber";
 import { lockInvoice, postInvoice, repostInvoice, statusAfterPayment } from "./invoiceCommon";
+import { newPublicToken } from "./publicInvoice";
 
 /** Header fields as parsed by `invoiceHeaderFields` (src/lib/schemas/invoices.ts). */
 export interface InvoiceHeaderInput {
@@ -138,6 +139,7 @@ export async function createInvoice(
         ...data,
         status: h.post ? "POSTED" : "DRAFT",
         postedAt: h.post ? new Date() : null,
+        publicToken: newPublicToken(),
         createdById: ctx.userId,
       },
     });

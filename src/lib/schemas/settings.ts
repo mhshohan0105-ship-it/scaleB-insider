@@ -48,12 +48,17 @@ export const profileSchema = z.object({
     z.string().trim().email("Enter a valid email").max(120).nullable().optional(),
   ),
   website: optionalText(200),
+  facebook: optionalText(200),
   tradeLicense: optionalText(60),
   iataNo: optionalText(30),
-  logoUrl: z.preprocess(
-    (v) => (typeof v === "string" && v.trim() === "" ? null : v),
-    z.string().trim().url("Enter a full URL starting with https://").max(500).nullable().optional(),
-  ),
+  pdf: z
+    .object({
+      showQr: z.boolean().default(true),
+      showStamp: z.boolean().default(true),
+      showPassports: z.boolean().default(true),
+      showPoweredBy: z.boolean().default(true),
+    })
+    .default({ showQr: true, showStamp: true, showPassports: true, showPoweredBy: true }),
 });
 
 export type ProfileInput = z.input<typeof profileSchema>;

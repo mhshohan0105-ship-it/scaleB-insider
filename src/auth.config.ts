@@ -2,7 +2,7 @@
 // No database or Node only imports here.
 import type { NextAuthConfig } from "next-auth";
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/verify/"];
 
 export const authConfig = {
   pages: { signIn: "/login" },

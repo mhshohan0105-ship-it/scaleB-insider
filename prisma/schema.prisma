@@ -31,6 +31,7 @@ model Agency {
   phone           String?      @db.Text
   email           String?      @db.Text
   website         String?      @db.Text
+  facebook        String?      @db.Text
   tradeLicense    String?      @db.Text
   iataNo          String?      @db.Text
   currency        String       @default("BDT") @db.Text
@@ -42,6 +43,7 @@ model Agency {
   updatedAt       DateTime     @updatedAt
 
   setting            AgencySetting?
+  images             AgencyImage[]
   users              User[]
   roles              Role[]
   loginHistory       LoginHistory[]
@@ -134,6 +136,11 @@ model AgencySetting {
   invoiceTerms          String?        @db.Text
   smsEnabled            Boolean        @default(false)
   defaultMoneyAccountId String?        @db.Text
+  /// What printed invoices show (Agency Profile > Printed documents).
+  pdfShowQr             Boolean        @default(true)
+  pdfShowStamp          Boolean        @default(true)
+  pdfShowPassports      Boolean        @default(true)
+  pdfShowPoweredBy      Boolean        @default(true)
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @updatedAt
   updatedById           String?        @db.Text
@@ -1124,6 +1131,12 @@ model Invoice {
   refundCost      Decimal       @default(0) @db.Decimal(14, 2)
   status          InvoiceStatus @default(DRAFT)
   note            String?       @db.Text
+  /// Client's own reference (PO number, file no) printed on the invoice.
+  reference       String?       @db.Text
+  /// Printed-invoice choices for this invoice.
+  showPrevDue     Boolean       @default(false)
+  showDiscount    Boolean       @default(true)
+  showExtraFee    Boolean       @default(false)
   currency        String        @default("BDT") @db.Text
   exchangeRate    Decimal       @default(1) @db.Decimal(14, 6)
   reissueOfId     String?       @db.Text
@@ -1133,6 +1146,8 @@ model Invoice {
   travelDate      DateTime?     @db.Date
   returnDate      DateTime?     @db.Date
   postedAt        DateTime?
+  /// Random code in the printed QR: opens the public verification page.
+  publicToken     String?       @unique @db.VarChar(32)
   voidReason      String?       @db.Text
   voidedAt        DateTime?
   voidedById      String?       @db.Text
@@ -1188,7 +1203,10 @@ model InvoiceAirTicket {
   segmentCount      Int           @default(1)
   journeyDate       DateTime      @db.Date
   returnDate        DateTime?     @db.Date
+  issueDate         DateTime?     @db.Date
   cabinClass        String?       @db.Text
+  /// Flight legs for the printed invoice: [{ from, to, airline, flightNo, date, departs, arrives }].
+  segments          Json          @default("[]")
   baseFare          Decimal       @db.Decimal(14, 2)
   /// [{ code, amount }] per tax code.
   taxes             Json          @default("[]")
@@ -1198,6 +1216,8 @@ model InvoiceAirTicket {
   commissionAmount  Decimal       @default(0) @db.Decimal(14, 2)
   aitAmount         Decimal       @default(0) @db.Decimal(14, 2)
   clientPrice       Decimal       @db.Decimal(14, 2)
+  /// Part of the client price shown as a separate fee when the invoice says so (not posted separately).
+  extraFee          Decimal       @default(0) @db.Decimal(14, 2)
   purchasePrice     Decimal       @db.Decimal(14, 2)
   profit            Decimal       @db.Decimal(14, 2)
   createdAt         DateTime      @default(now())
@@ -2258,4 +2278,21 @@ model BackupConfig {
   googleEmail        String?  @db.Text
   driveFolderId      String?  @db.Text
   updatedAt          DateTime @updatedAt
+}
+
+/// Agency logo and seal/signature image, printed on documents. Stored in the
+/// database so a database backup holds them too.
+model AgencyImage {
+  id          String   @id @default(cuid())
+  agencyId    String
+  kind        String   @db.VarChar(16) // LOGO | SEAL
+  mimeType    String   @db.VarChar(64)
+  size        Int
+  data        Bytes    @db.MediumBlob
+  updatedAt   DateTime @updatedAt
+  updatedById String?  @db.Text
+
+  agency Agency @relation(fields: [agencyId], references: [id])
+
+  @@unique([agencyId, kind])
 }

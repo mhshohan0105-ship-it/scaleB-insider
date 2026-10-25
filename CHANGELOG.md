@@ -319,3 +319,11 @@ Verified: `npm run check` green (218 unit + 133 integration), Playwright 28/28. 
 - Fix: "(optional)" marks are hidden in the summary and dense line rows (antd's style was winning).
 
 Verified: `npm run check` green (218 unit + 133 integration), Playwright 28/28.
+
+## Invoice lists and the refund wizard (2026-10-26)
+
+- Invoice lists (every type): four summary cards (invoiced, received with % collected, due with count, profit with margin), status tabs with counts under the current filters (All, Due, Partly paid, Paid, Draft, Void), invoice number with date, client with code and phone, passengers (first name, "+N more", full list on hover), sold by, and per row a **Receive** button for invoices with a balance plus a ⋯ menu (View, Edit, Print / PDF, Client ledger). `listInvoices` returns phone, sold by, passenger names, total profit and status counts.
+- Refunds (all refund types) are a three-step wizard: 1 choose the invoice and tick the lines; 2 amounts per line, refund charge, credit or pay back, with a running "How it adds up"; 3 check the client's balance before and after, what comes back from vendors and the effect on profit, then save. Nothing about the posting changed.
+- Playwright refund test steps through the wizard.
+
+Verified: `npm run check` green (218 unit + 133 integration), Playwright 28/28.

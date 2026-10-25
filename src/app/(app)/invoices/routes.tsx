@@ -72,6 +72,8 @@ export async function renderInvoiceList(
       params={params}
       status={status}
       canCreate={can(a.user.permissions, info.module, "create")}
+      canEdit={a.canEdit}
+      canReceive={a.canReceive}
     />
   );
 }

@@ -132,6 +132,10 @@ export interface InvoiceListRow {
   clientId: string;
   clientName: string;
   clientCode: string;
+  clientPhone: string | null;
+  soldBy: string | null;
+  /** Distinct passenger / pilgrim names on the lines (first few). */
+  passengers: string[];
   netTotal: string;
   paidAmount: string;
   refundCredit: string;
@@ -162,7 +166,9 @@ export async function listInvoices(
 ): Promise<{
   rows: InvoiceListRow[];
   total: number;
-  totals: { net: string; paid: string; refunded: string; due: string };
+  totals: { net: string; paid: string; refunded: string; due: string; profit: string };
+  /** Invoices per status under the same filters (for the status tabs). */
+  statusCounts: Record<string, number>;
 }> {
   const db = tenantDb(ctx.agencyId);
   const where: Prisma.InvoiceWhereInput = type ? { type } : {};
@@ -194,15 +200,22 @@ export async function listInvoices(
       { visaLines: { some: { passengerName: { contains: q } } } },
     ];
   }
+  const { status: _status, ...anyStatus } = where;
+  void _status;
   const liveWhere: Prisma.InvoiceWhereInput = {
     ...where,
     status: where.status ?? { notIn: ["VOID", "DRAFT"] },
   };
-  const [rows, total, sums] = await Promise.all([
+  const [rows, total, sums, byStatus] = await Promise.all([
     db.invoice.findMany({
       where,
       include: {
-        client: { select: { name: true, code: true } },
+        client: { select: { name: true, code: true, phone: true } },
+        salesman: { select: { name: true } },
+        airTickets: { select: { passengerName: true }, orderBy: { sortOrder: "asc" }, take: 6 },
+        visaLines: { select: { passengerName: true }, take: 6 },
+        items: { select: { passengerName: true }, take: 6 },
+        reissueLines: { select: { passengerName: true }, take: 6 },
         _count: {
           select: { airTickets: true, items: true, visaLines: true, reissueLines: true },
         },
@@ -214,8 +227,9 @@ export async function listInvoices(
     db.invoice.count({ where }),
     db.invoice.aggregate({
       where: liveWhere,
-      _sum: { netTotal: true, paidAmount: true, refundCredit: true },
+      _sum: { netTotal: true, paidAmount: true, refundCredit: true, profit: true },
     }),
+    db.invoice.groupBy({ by: ["status"], where: anyStatus, _count: { _all: true } }),
   ]);
   const zero = new Prisma.Decimal(0);
   const net = sums._sum.netTotal ?? zero;
@@ -228,7 +242,9 @@ export async function listInvoices(
       paid: paid.toFixed(2),
       refunded: refunded.toFixed(2),
       due: net.minus(refunded).minus(paid).toFixed(2),
+      profit: (sums._sum.profit ?? zero).toFixed(2),
     },
+    statusCounts: Object.fromEntries(byStatus.map((g) => [g.status, g._count._all])),
     rows: rows.map((r) => ({
       id: r.id,
       type: r.type,
@@ -237,6 +253,15 @@ export async function listInvoices(
       clientId: r.clientId,
       clientName: r.client.name,
       clientCode: r.client.code,
+      clientPhone: r.client.phone,
+      soldBy: r.salesman?.name ?? null,
+      passengers: [
+        ...new Set(
+          [...r.airTickets, ...r.visaLines, ...r.items, ...r.reissueLines]
+            .map((l) => l.passengerName)
+            .filter((n): n is string => !!n),
+        ),
+      ],
       netTotal: r.netTotal.toFixed(2),
       paidAmount: r.paidAmount.toFixed(2),
       refundCredit: r.refundCredit.toFixed(2),

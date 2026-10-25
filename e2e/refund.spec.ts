@@ -52,10 +52,13 @@ test("ticket → reissue → refund with charges → void refund → void list",
   await page.getByRole("link", { name: "rollback Refund" }).click();
   await expect(page).toHaveURL(/\/refunds\/airticket\/new\?invoice=/);
   await page.getByRole("checkbox", { name: new RegExp(`Refund ${ticketNo}`) }).check();
+  await page.getByRole("button", { name: "Next" }).click();
   await page.getByLabel("Refund charge").fill("1000");
   await page.getByLabel("Vendor charge 1").fill("500");
   await expect(page.getByText("19,000.00").first()).toBeVisible(); // credit to client
   await expect(page.getByText("17,500.00").first()).toBeVisible(); // back from vendor
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(page.getByRole("button", { name: "Save refund" })).toBeVisible();
   await page.getByRole("button", { name: "Save refund" }).click();
   await expect(page).toHaveURL(/\/refunds\/airticket\/(?!new$)[a-z0-9]+$/, { timeout: 30_000 });
   const refundNo = (await page.getByRole("heading", { level: 3 }).textContent())!.trim();

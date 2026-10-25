@@ -13,12 +13,12 @@ import {
   DatePicker,
   Descriptions,
   Empty,
-  Flex,
   Form,
   Input,
   Radio,
   Row,
   Select,
+  Steps,
   Table,
   Typography,
 } from "antd";
@@ -30,6 +30,7 @@ import { formatDate, formatMoney } from "@/lib/format";
 import { INVOICE_TYPE_INFO, type InvoiceTypeKey } from "@/lib/invoiceTypes";
 import { REFUND_TYPE_INFO, type RefundTypeKey } from "@/lib/refundTypes";
 import { MoneyInput } from "@/components/MoneyInput";
+import { MoneyLine } from "@/components/invoices/InvoiceFormParts";
 import { PageHeader } from "@/components/PageHeader";
 import { applyActionResult } from "@/components/formResult";
 import {
@@ -69,6 +70,14 @@ type InvoiceOption = { value: string; label: string };
 
 const nonZero = (v?: string | null) => !!v && d(v).greaterThan(0);
 
+/** Positive = the client owes us; negative = we hold their money. */
+function balanceText(v: ReturnType<typeof d>) {
+  if (v.isZero()) return "Nothing due";
+  return v.isNegative()
+    ? `We owe ${formatMoney(v.negated().toFixed(2))}`
+    : `Owes ${formatMoney(v.toFixed(2))}`;
+}
+
 export function RefundForm({ type, today, initialTarget, accounts }: Props) {
   const info = REFUND_TYPE_INFO[type];
   const router = useRouter();
@@ -89,6 +98,7 @@ export function RefundForm({ type, today, initialTarget, accounts }: Props) {
   const [searching, setSearching] = useState(false);
   const values = Form.useWatch([], form) as FormValues | undefined;
   const searchSeq = useRef(0);
+  const [step, setStep] = useState(0);
 
   function search(q: string) {
     const seq = ++searchSeq.current;
@@ -162,6 +172,27 @@ export function RefundForm({ type, today, initialTarget, accounts }: Props) {
   const payable =
     target && figures ? cashReturnable(target.client.balance, figures.clientCredit) : null;
   const cash = values?.method === "CASH_RETURN";
+
+  /** Checks the current step before moving on. */
+  function next() {
+    if (step === 0) {
+      form
+        .validateFields(["invoiceId", "date"])
+        .then(() => {
+          if (!chosen.length) message.error("Tick at least one line to refund");
+          else setStep(1);
+        })
+        .catch(() => message.error("Please fix the highlighted fields"));
+      return;
+    }
+    form
+      .validateFields(["clientCharge", "method", "moneyAccountId", "returnAmount"])
+      .then(() => {
+        if (!figures) message.error("Check the amounts");
+        else setStep(2);
+      })
+      .catch(() => message.error("Please fix the highlighted fields"));
+  }
 
   function submit() {
     form
@@ -251,6 +282,20 @@ export function RefundForm({ type, today, initialTarget, accounts }: Props) {
         </>
       ),
     },
+  ];
+  const amountColumns: TableColumnsType<Line> = [
+    {
+      title: "Line",
+      key: "line",
+      render: (_, l) => (
+        <>
+          {l.description}
+          <div style={{ fontSize: 12, color: "#888" }}>
+            {[l.detail, l.vendorName].filter(Boolean).join(" · ")}
+          </div>
+        </>
+      ),
+    },
     ...(info.partial
       ? [
           {
@@ -314,189 +359,269 @@ export function RefundForm({ type, today, initialTarget, accounts }: Props) {
             form.setFieldValue("returnAmount", payable.toFixed(2));
         }}
       >
-        <Card title="Invoice" style={{ marginBottom: 16 }}>
-          <Row gutter={16}>
-            <Col xs={24} lg={14}>
-              <Form.Item
-                label="Invoice"
-                name="invoiceId"
-                rules={[{ required: true, message: "Choose the invoice" }]}
-              >
-                <Select
-                  showSearch
-                  filterOption={false}
-                  onSearch={search}
-                  loading={searching}
-                  options={options}
-                  onChange={pickInvoice}
-                  placeholder="Invoice no., client, ticket no. or passenger"
-                  notFoundContent={searching ? "Searching..." : "No refundable invoices"}
-                />
-              </Form.Item>
-            </Col>
-            <Col xs={12} lg={5}>
-              <Form.Item
-                label="Refund date"
-                name="date"
-                rules={[{ required: true, message: "Choose a date" }]}
-              >
-                <DatePicker format="DD MMM YYYY" style={{ width: "100%" }} allowClear={false} />
-              </Form.Item>
-            </Col>
-          </Row>
-          {target && (
-            <Descriptions
-              size="small"
-              column={{ xs: 1, md: 3 }}
-              items={[
-                {
-                  key: "inv",
-                  label: "Invoice",
-                  children: (
-                    <Link
-                      href={`${INVOICE_TYPE_INFO[target.type as InvoiceTypeKey].path}/${target.id}`}
-                    >
-                      {target.number}
-                    </Link>
-                  ),
-                },
-                {
-                  key: "client",
-                  label: "Client",
-                  children: <Link href={`/clients/${target.client.id}`}>{target.client.name}</Link>,
-                },
-                { key: "date", label: "Date", children: formatDate(target.date) },
-                { key: "net", label: "Total", children: formatMoney(target.netTotal) },
-                { key: "paid", label: "Received", children: formatMoney(target.paidAmount) },
-                {
-                  key: "bal",
-                  label: "Client balance",
-                  children: d(target.client.balance).isNegative()
-                    ? `${formatMoney(target.client.balance.slice(1))} advance`
-                    : `${formatMoney(target.client.balance)} due`,
-                },
-              ]}
-            />
-          )}
-        </Card>
+        <Steps
+          current={step}
+          style={{ marginBottom: 20 }}
+          items={[
+            { title: "Choose the lines", description: "Invoice and what to refund" },
+            { title: "Amounts", description: "Charges and how the client is paid" },
+            { title: "Check and save", description: "Balances after the refund" },
+          ]}
+        />
 
-        <Card title="Lines to refund" style={{ marginBottom: 16 }}>
-          {target ? (
-            <Table<Line>
-              rowKey="lineId"
-              size="small"
-              pagination={false}
-              columns={columns}
-              dataSource={rows}
-              scroll={{ x: "max-content" }}
-            />
-          ) : (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Choose an invoice first" />
-          )}
-        </Card>
+        <div hidden={step !== 0}>
+          <Card title="Invoice" style={{ marginBottom: 16 }}>
+            <Row gutter={16}>
+              <Col xs={24} lg={14}>
+                <Form.Item
+                  label="Invoice"
+                  name="invoiceId"
+                  rules={[{ required: true, message: "Choose the invoice" }]}
+                >
+                  <Select
+                    showSearch
+                    filterOption={false}
+                    onSearch={search}
+                    loading={searching}
+                    options={options}
+                    onChange={pickInvoice}
+                    placeholder="Invoice no., client, ticket no. or passenger"
+                    notFoundContent={searching ? "Searching..." : "No refundable invoices"}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={12} lg={5}>
+                <Form.Item
+                  label="Refund date"
+                  name="date"
+                  rules={[{ required: true, message: "Choose a date" }]}
+                >
+                  <DatePicker format="DD MMM YYYY" style={{ width: "100%" }} allowClear={false} />
+                </Form.Item>
+              </Col>
+            </Row>
+            {target && (
+              <Descriptions
+                size="small"
+                column={{ xs: 1, md: 3 }}
+                items={[
+                  {
+                    key: "inv",
+                    label: "Invoice",
+                    children: (
+                      <Link
+                        href={`${INVOICE_TYPE_INFO[target.type as InvoiceTypeKey].path}/${target.id}`}
+                      >
+                        {target.number}
+                      </Link>
+                    ),
+                  },
+                  {
+                    key: "client",
+                    label: "Client",
+                    children: (
+                      <Link href={`/clients/${target.client.id}`}>{target.client.name}</Link>
+                    ),
+                  },
+                  { key: "date", label: "Date", children: formatDate(target.date) },
+                  { key: "net", label: "Total", children: formatMoney(target.netTotal) },
+                  { key: "paid", label: "Received", children: formatMoney(target.paidAmount) },
+                  {
+                    key: "bal",
+                    label: "Client balance",
+                    children: balanceText(d(target.client.balance)),
+                  },
+                ]}
+              />
+            )}
+          </Card>
 
-        <Row gutter={16}>
-          <Col xs={24} lg={12}>
-            <Card title="Client" style={{ marginBottom: 16 }}>
-              <Form.Item label="Refund charge (kept from the client)" name="clientCharge">
-                <MoneyInput placeholder="0.00" />
-              </Form.Item>
-              <Form.Item label="Client gets the money" name="method">
-                <Radio.Group
-                  options={[
-                    { value: "ADJUST_TO_BALANCE", label: "Keep as credit on the account" },
-                    { value: "CASH_RETURN", label: "Pay back now" },
-                  ]}
-                />
-              </Form.Item>
-              {cash && (
-                <Row gutter={12}>
-                  <Col span={12}>
-                    <Form.Item
-                      label="Pay from"
-                      name="moneyAccountId"
-                      rules={[{ required: true, message: "Choose the account" }]}
-                    >
-                      <Select showSearch optionFilterProp="label" options={accounts} />
-                    </Form.Item>
-                  </Col>
-                  <Col span={12}>
-                    <Form.Item
-                      label="Amount paid back"
-                      name="returnAmount"
-                      rules={[{ required: true, message: "Enter the amount" }]}
-                      extra={
-                        payable
-                          ? `Up to ${formatMoney(payable.toFixed(2))} (the client's credit after this refund)`
-                          : undefined
-                      }
-                    >
-                      <MoneyInput />
-                    </Form.Item>
-                  </Col>
-                </Row>
-              )}
-              <Form.Item label="Note" name="note">
-                <Input.TextArea rows={2} maxLength={500} />
-              </Form.Item>
-            </Card>
-          </Col>
-          <Col xs={24} lg={12}>
-            <Card title="Summary" style={{ marginBottom: 16 }}>
-              {figures ? (
-                <Descriptions
-                  bordered
+          <Card title="Lines to refund" style={{ marginBottom: 16 }}>
+            {target ? (
+              <Table<Line>
+                rowKey="lineId"
+                size="small"
+                pagination={false}
+                columns={columns}
+                dataSource={rows}
+                scroll={{ x: "max-content" }}
+              />
+            ) : (
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Choose an invoice first" />
+            )}
+          </Card>
+        </div>
+
+        <div hidden={step !== 1}>
+          <div className="inv-layout">
+            <div className="inv-main">
+              <Card title="Amounts per line" style={{ marginBottom: 16 }}>
+                <Table<Line>
+                  rowKey="lineId"
                   size="small"
-                  column={1}
-                  items={[
-                    {
-                      key: "r",
-                      label: "Sales taken back",
-                      children: formatMoney(figures.clientRefundAmount.toFixed(2)),
-                    },
-                    {
-                      key: "c",
-                      label: "Refund charge",
-                      children: `- ${formatMoney(figures.clientCharge.toFixed(2))}`,
-                    },
-                    {
-                      key: "cc",
-                      label: "Credit to client",
-                      children: <strong>{formatMoney(figures.clientCredit.toFixed(2))}</strong>,
-                    },
-                    {
-                      key: "vc",
-                      label: "Back from vendors",
-                      children: formatMoney(figures.vendorCredit.toFixed(2)),
-                    },
-                    {
-                      key: "p",
-                      label: "Effect on profit",
-                      children: (
-                        <Typography.Text
-                          type={figures.profitEffect.isNegative() ? "danger" : "success"}
-                        >
-                          {formatMoney(figures.profitEffect.toFixed(2))}
-                        </Typography.Text>
-                      ),
-                    },
-                  ]}
+                  pagination={false}
+                  columns={amountColumns}
+                  dataSource={rows.filter((l) => values?.lines?.[l.index]?.selected)}
+                  scroll={{ x: "max-content" }}
                 />
-              ) : (
-                <Alert type="warning" message="Check the amounts" />
-              )}
-            </Card>
-          </Col>
-        </Row>
+              </Card>
+              <Card title="Client" style={{ marginBottom: 16 }}>
+                <Form.Item label="Refund charge (kept from the client)" name="clientCharge">
+                  <MoneyInput placeholder="0.00" />
+                </Form.Item>
+                <Form.Item label="Client gets the money" name="method">
+                  <Radio.Group
+                    options={[
+                      { value: "ADJUST_TO_BALANCE", label: "Keep as credit on the account" },
+                      { value: "CASH_RETURN", label: "Pay back now" },
+                    ]}
+                  />
+                </Form.Item>
+                {cash && (
+                  <Row gutter={12}>
+                    <Col span={12}>
+                      <Form.Item
+                        label="Pay from"
+                        name="moneyAccountId"
+                        rules={[{ required: true, message: "Choose the account" }]}
+                      >
+                        <Select showSearch optionFilterProp="label" options={accounts} />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item
+                        label="Amount paid back"
+                        name="returnAmount"
+                        rules={[{ required: true, message: "Enter the amount" }]}
+                        extra={
+                          payable
+                            ? `Up to ${formatMoney(payable.toFixed(2))} (the client's credit after this refund)`
+                            : undefined
+                        }
+                      >
+                        <MoneyInput />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                )}
+                <Form.Item label="Note" name="note">
+                  <Input.TextArea rows={2} maxLength={500} />
+                </Form.Item>
+              </Card>
+            </div>
+            <aside className="inv-aside">
+              <Card title="How it adds up" style={{ marginBottom: 16 }}>
+                {figures ? (
+                  <div style={{ display: "grid", gap: 10 }}>
+                    <MoneyLine
+                      label="Sales taken back"
+                      value={formatMoney(figures.clientRefundAmount.toFixed(2))}
+                    />
+                    <MoneyLine
+                      label="Refund charge"
+                      value={`- ${formatMoney(figures.clientCharge.toFixed(2))}`}
+                    />
+                    <MoneyLine
+                      label="Credit to client"
+                      value={formatMoney(figures.clientCredit.toFixed(2))}
+                      strong
+                    />
+                    <MoneyLine
+                      label="Back from vendors"
+                      value={formatMoney(figures.vendorCredit.toFixed(2))}
+                    />
+                    <MoneyLine
+                      label="Effect on profit"
+                      value={formatMoney(figures.profitEffect.toFixed(2))}
+                      strong
+                      tone={figures.profitEffect.isNegative() ? "danger" : "success"}
+                    />
+                  </div>
+                ) : (
+                  <Alert type="warning" message="Check the amounts" />
+                )}
+              </Card>
+            </aside>
+          </div>
+        </div>
 
-        <Flex gap={8} justify="flex-end" style={{ marginBottom: 24 }}>
+        <div hidden={step !== 2}>
+          {target && figures && (
+            <>
+              <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                <Col xs={24} md={8}>
+                  <Card size="small" title="Client balance" style={{ height: "100%" }}>
+                    <Typography.Text type="secondary">
+                      {balanceText(d(target.client.balance))} →
+                    </Typography.Text>
+                    <div style={{ fontSize: 20, fontWeight: 700 }}>
+                      {balanceText(
+                        d(target.client.balance)
+                          .minus(figures.clientCredit)
+                          .plus(cash ? d(values?.returnAmount) : d(0)),
+                      )}
+                    </div>
+                  </Card>
+                </Col>
+                <Col xs={24} md={8}>
+                  <Card size="small" title="Back from vendors" style={{ height: "100%" }}>
+                    <div style={{ fontSize: 20, fontWeight: 700 }}>
+                      {formatMoney(figures.vendorCredit.toFixed(2))}
+                    </div>
+                    <Typography.Text type="secondary">
+                      Lowers what you owe the vendor, or becomes an advance with them
+                    </Typography.Text>
+                  </Card>
+                </Col>
+                <Col xs={24} md={8}>
+                  <Card size="small" title="Effect on profit" style={{ height: "100%" }}>
+                    <div
+                      style={{
+                        fontSize: 20,
+                        fontWeight: 700,
+                        color: figures.profitEffect.isNegative() ? "#b42318" : "#067647",
+                      }}
+                    >
+                      {formatMoney(figures.profitEffect.toFixed(2))}
+                    </div>
+                    <Typography.Text type="secondary">
+                      {cash
+                        ? `Pay back ${formatMoney(d(values?.returnAmount).toFixed(2))} now`
+                        : "The credit stays on the client's account"}
+                    </Typography.Text>
+                  </Card>
+                </Col>
+              </Row>
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message="Saving posts the refund to the books. To undo it later, void the refund; nothing is deleted."
+              />
+            </>
+          )}
+        </div>
+
+        <div className="inv-actions">
+          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+            Step {step + 1} of 3
+            {figures ? ` · Credit to client ${formatMoney(figures.clientCredit.toFixed(2))}` : ""}
+          </Typography.Text>
+          <div style={{ flex: 1 }} />
           <Link href={info.path}>
             <Button>Cancel</Button>
           </Link>
-          <Button type="primary" loading={pending} onClick={submit} disabled={!target}>
-            Save refund
-          </Button>
-        </Flex>
+          {step > 0 && <Button onClick={() => setStep(step - 1)}>Back</Button>}
+          {step < 2 ? (
+            <Button type="primary" disabled={!target} onClick={next}>
+              Next
+            </Button>
+          ) : (
+            <Button type="primary" loading={pending} onClick={submit} disabled={!target}>
+              Save refund
+            </Button>
+          )}
+        </div>
       </Form>
     </>
   );

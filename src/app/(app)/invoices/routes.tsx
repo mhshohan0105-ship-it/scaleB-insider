@@ -111,7 +111,7 @@ export async function renderNewInvoice(type: InvoiceTypeKey) {
         type={type}
         mode="create"
         today={today}
-        {...await airInvoiceFormOptions(a.ctx)}
+        {...await airInvoiceFormOptions(a.ctx, a.canReceive)}
       />
     );
   }

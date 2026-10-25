@@ -303,3 +303,11 @@ Verified: `npm run check` green (217 unit + 127 integration, 5 new for branding 
 - `writeMoneyReceipt` lets other services write a receipt inside their own transaction.
 
 Verified: `npm run check` green (218 unit + 133 integration, 6 new), Playwright 28/28.
+
+## Air ticket form in the new layout (2026-10-25)
+
+- Air ticket and non commission invoices use the approved layout: client & invoice card (Existing / New client), ticket cards with a numbered badge and route/airline heading, grouped Fare (with Extra fee) and Passenger sections, a live "This ticket" panel (total fare, commission, AIT, we pay, client pays, profit in green or red), optional flight segments, "Receive payment now" (account, method, amount, date, reference; method follows the account), a sticky summary (tickets, discount, service charge, VAT, net total, due, payable, profit), printed-invoice switches with reference and note, and a sticky action bar (Cancel, Save as draft, Post and print, Save & post).
+- Invoice PDF: reference in the details, a Flight details table, "incl. fee" under a ticket's amount when chosen, previous due and total due when chosen, subtotal and discount hidden when "show discount" is off; the stamp sits lower.
+- Visa, item and reissue invoice views return the reference and print choices too.
+
+Verified: `npm run check` green (218 unit + 133 integration), Playwright 28/28. Checked in the browser: live per-ticket figures, summary, and the PDF with flights, fee, reference and previous due.

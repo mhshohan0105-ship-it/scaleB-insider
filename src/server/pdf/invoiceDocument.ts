@@ -46,6 +46,23 @@ export interface PdfInvoice {
   soldBy: string | null;
   /** One row per distinct passenger (name + passport) across the lines. */
   passengers: PdfPassenger[];
+  reference: string | null;
+  showDiscount: boolean;
+  showPrevDue: boolean;
+  /** Flight legs of the tickets, in ticket order. */
+  segments: PdfSegment[];
+  /** Client balance before this invoice; set by the route when "show previous due" is on. */
+  previousDue: string | null;
+}
+
+export interface PdfSegment {
+  from: string;
+  to: string;
+  airline: string | null;
+  flightNo: string | null;
+  date: string | null;
+  departs: string | null;
+  arrives: string | null;
 }
 
 type Common = Pick<
@@ -65,11 +82,21 @@ type Common = Pick<
   | "note"
 >;
 
-type CommonIn = Common & { salesman?: { name: string } | null };
+type CommonIn = Common & {
+  salesman?: { name: string } | null;
+  reference?: string | null;
+  showDiscount?: boolean;
+  showPrevDue?: boolean;
+};
 
-function common(inv: CommonIn): Common & { soldBy: string | null } {
+function common(inv: CommonIn) {
   return {
     soldBy: inv.salesman?.name ?? null,
+    reference: inv.reference ?? null,
+    showDiscount: inv.showDiscount ?? true,
+    showPrevDue: inv.showPrevDue ?? false,
+    segments: [] as PdfSegment[],
+    previousDue: null,
     number: inv.number,
     status: inv.status,
     date: inv.date,
@@ -128,9 +155,26 @@ export function ticketDocument(inv: AirInvoiceView): PdfInvoice {
           main: formatDate(t.journeyDate),
           sub: t.returnDate ? `Return ${formatDate(t.returnDate)}` : null,
         },
-        { main: formatMoney(t.clientPrice) },
+        {
+          main: formatMoney(t.clientPrice),
+          sub:
+            inv.showExtraFee && t.extraFee !== "0.00"
+              ? `incl. fee ${formatMoney(t.extraFee)}`
+              : null,
+        },
       ],
     })),
+    segments: inv.tickets.flatMap((t) =>
+      t.segments.map((g) => ({
+        from: g.from,
+        to: g.to,
+        airline: g.airline ?? null,
+        flightNo: g.flightNo ?? null,
+        date: g.date ?? null,
+        departs: g.departs ?? null,
+        arrives: g.arrives ?? null,
+      })),
+    ),
   };
 }
 

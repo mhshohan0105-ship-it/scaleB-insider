@@ -172,6 +172,10 @@ export async function getReissueInvoice(ctx: ServiceContext, id: string) {
     refundCredit: money(inv.refundCredit),
     due: money(inv.netTotal.minus(inv.refundCredit).minus(inv.paidAmount)),
     note: inv.note,
+    reference: inv.reference,
+    showPrevDue: inv.showPrevDue,
+    showDiscount: inv.showDiscount,
+    showExtraFee: inv.showExtraFee,
     voidReason: inv.voidReason,
     lines: inv.reissueLines.map((l) => ({
       id: l.id,
@@ -218,6 +222,10 @@ export function reissueFormValues(inv: ReissueInvoiceView) {
     serviceCharge: inv.serviceCharge,
     vat: inv.vat,
     note: inv.note,
+    reference: inv.reference,
+    showPrevDue: inv.showPrevDue,
+    showDiscount: inv.showDiscount,
+    showExtraFee: inv.showExtraFee,
     lines: inv.lines.map((l) => ({
       originalTicketId: l.originalTicketId,
       ticketNo: l.ticketNo,

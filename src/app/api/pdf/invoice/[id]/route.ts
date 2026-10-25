@@ -13,6 +13,7 @@ import {
   visaDocument,
   type PdfInvoice,
 } from "@/server/pdf/invoiceDocument";
+import { tenantDb } from "@/server/db/tenant";
 import type { ServiceContext } from "@/server/services/context";
 import { getAirInvoice } from "@/server/services/invoices/airInvoiceService";
 import { invoiceTypeOf } from "@/server/services/invoices/invoiceCommon";
@@ -48,6 +49,18 @@ async function loadDocument(
   return null;
 }
 
+/** What the client owed before this invoice (cached balance less this invoice's due). */
+async function previousDue(ctx: ServiceContext, invoiceId: string, due: string) {
+  const db = tenantDb(ctx.agencyId);
+  const inv = await db.invoice.findFirst({ where: { id: invoiceId }, select: { clientId: true } });
+  const client = inv
+    ? await db.client.findFirst({ where: { id: inv.clientId }, select: { balance: true } })
+    : null;
+  if (!client) return null;
+  const before = client.balance.minus(due);
+  return before.greaterThan(0) ? before.toFixed(2) : "0.00";
+}
+
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getUserContext();
@@ -64,6 +77,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   ]);
   if (!invoice) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const branding = await invoiceBranding(ctx, agency, id, invoice.status);
+  if (invoice.showPrevDue) invoice.previousDue = await previousDue(ctx, id, invoice.due);
 
   const pdf = await renderToBuffer(
     createElement(InvoicePdf, {

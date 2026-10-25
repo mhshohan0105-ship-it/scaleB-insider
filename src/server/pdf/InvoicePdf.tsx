@@ -6,6 +6,7 @@
 // only, never cost or profit. What prints is set in Agency Profile.
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { amountInWords } from "@/lib/amountInWords";
+import { d } from "@/lib/calc/money";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { AgencyProfile, PdfOptions } from "@/server/services/settings/settingsService";
 import type { PdfInvoice } from "./invoiceDocument";
@@ -57,7 +58,7 @@ const s = StyleSheet.create({
   totals: { width: 220, borderWidth: 0.5, borderColor: LINE, borderRadius: 4 },
   totalRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4.5, paddingHorizontal: 9, borderBottomWidth: 0.5, borderColor: LINE },
   totalStrong: { backgroundColor: "#f3f6f5" },
-  stamp: { position: "absolute", top: 430, left: 205, borderWidth: 2.5, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 18, fontSize: 30, fontFamily: "Helvetica-Bold", letterSpacing: 5, transform: "rotate(-16deg)", opacity: 0.42 },
+  stamp: { position: "absolute", top: 600, left: 150, borderWidth: 2.5, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 18, fontSize: 30, fontFamily: "Helvetica-Bold", letterSpacing: 5, transform: "rotate(-16deg)", opacity: 0.42 },
   signRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 34 },
   sign: { width: 160, alignItems: "center" },
   signLine: { width: "100%", borderTopWidth: 0.7, borderColor: INK, marginTop: 3, paddingTop: 3, textAlign: "center", fontSize: 8.5 },
@@ -193,6 +194,12 @@ export function InvoicePdf({
                 <Text style={s.metaVal}>{invoice.soldBy}</Text>
               </View>
             )}
+            {invoice.reference && (
+              <View style={s.metaRow}>
+                <Text style={s.metaKey}>Reference</Text>
+                <Text style={s.metaVal}>{invoice.reference}</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -235,6 +242,36 @@ export function InvoicePdf({
           </View>
         ))}
 
+        {invoice.segments.length > 0 && (
+          <View wrap={false}>
+            <Text style={[s.section, { marginTop: 12 }]}>FLIGHT DETAILS</Text>
+            <View style={s.th}>
+              {["From", "To", "Airline", "Flight", "Date", "Departs", "Arrives"].map((h) => (
+                <Text key={h} style={[s.thCell, { flex: 1 }]}>
+                  {h}
+                </Text>
+              ))}
+            </View>
+            {invoice.segments.map((g, i) => (
+              <View key={i} style={s.tr}>
+                {[
+                  g.from,
+                  g.to,
+                  g.airline ?? "",
+                  g.flightNo ?? "",
+                  g.date ? formatDate(g.date) : "",
+                  g.departs ?? "",
+                  g.arrives ?? "",
+                ].map((v, j) => (
+                  <Text key={j} style={[s.td, { flex: 1 }]}>
+                    {v}
+                  </Text>
+                ))}
+              </View>
+            ))}
+          </View>
+        )}
+
         <View style={s.below} wrap={false}>
           <View style={s.words}>
             <Text>
@@ -249,8 +286,10 @@ export function InvoicePdf({
             )}
           </View>
           <View style={s.totals}>
-            <Total label={invoice.linesLabel} value={formatMoney(invoice.subtotal)} />
-            {invoice.discount !== "0.00" && (
+            {invoice.showDiscount && (
+              <Total label={invoice.linesLabel} value={formatMoney(invoice.subtotal)} />
+            )}
+            {invoice.showDiscount && invoice.discount !== "0.00" && (
               <Total label="Discount" value={`- ${formatMoney(invoice.discount)}`} />
             )}
             {invoice.serviceCharge !== "0.00" && (
@@ -265,6 +304,19 @@ export function InvoicePdf({
               strong
               color={invoice.due === "0.00" ? undefined : "#b42318"}
             />
+            {invoice.previousDue !== null && (
+              <>
+                <Total label="Previous due" value={formatMoney(invoice.previousDue)} />
+                <Total
+                  label="Total due"
+                  value={`BDT ${formatMoney(
+                    d(invoice.previousDue).plus(invoice.due).toFixed(2),
+                  )}`}
+                  strong
+                  color="#b42318"
+                />
+              </>
+            )}
           </View>
         </View>
 

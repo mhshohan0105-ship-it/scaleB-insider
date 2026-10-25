@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Alert,
@@ -10,7 +9,6 @@ import {
   Card,
   Col,
   DatePicker,
-  Flex,
   Form,
   Input,
   Row,
@@ -21,6 +19,7 @@ import {
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import { calcInvoiceTotals } from "@/lib/calc/invoiceTotals";
+import { d } from "@/lib/calc/money";
 import { calcReissueLine } from "@/lib/calc/reissue";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { FieldOption } from "@/lib/masters";
@@ -35,7 +34,16 @@ import {
 } from "@/app/(app)/invoices/invoiceActions";
 import type { ReissuableTicket } from "@/server/services/invoices/reissueInvoiceService";
 import { InvoiceHeaderCard } from "./InvoiceHeaderCard";
-import { InvoiceTotalsCard } from "./InvoiceTotalsCard";
+import {
+  InvoiceActionBar,
+  InvoiceSummaryAside,
+  ReceivePaymentCard,
+  methodForAccount,
+  openPrintWindow,
+  paymentPayload,
+  type AccountOption,
+  type PaymentFormValues,
+} from "./InvoiceFormParts";
 
 interface Line {
   originalTicketId?: string;
@@ -60,6 +68,10 @@ interface FormValues {
   serviceCharge?: string | null;
   vat?: string | null;
   note?: string | null;
+  reference?: string | null;
+  showPrevDue?: boolean;
+  showDiscount?: boolean;
+  payment?: PaymentFormValues;
   lines?: Line[];
 }
 
@@ -81,6 +93,8 @@ interface Props {
   clientId?: string;
   today: string;
   employees: FieldOption[];
+  /** Accounts money can go into; empty when the user may not take payments. */
+  accounts?: AccountOption[];
 }
 
 const iso = (v?: Dayjs | null) => (v ? v.format("YYYY-MM-DD") : null);
@@ -106,12 +120,15 @@ export function ReissueInvoiceForm({
   clientId: presetClient,
   today,
   employees,
+  accounts = [],
 }: Props) {
   const router = useRouter();
   const { message } = App.useApp();
   const [form] = Form.useForm<FormValues>();
   const [pending, startTransition] = useTransition();
   const values = Form.useWatch([], form) as FormValues | undefined;
+  const [receive, setReceive] = useState(false);
+  const canReceive = mode === "create" && accounts.length > 0;
   const clientId = Form.useWatch("clientId", form) as string | undefined;
   const [tickets, setTickets] = useState<ReissuableTicket[]>([]);
   const [loading, setLoading] = useState(false);
@@ -171,7 +188,8 @@ export function ReissueInvoiceForm({
     form.setFieldValue("lines", lines);
   }
 
-  function submit(post: boolean) {
+  function submit(post: boolean, print = false) {
+    const printed = openPrintWindow(print);
     form
       .validateFields()
       .then((v) => {
@@ -184,6 +202,7 @@ export function ReissueInvoiceForm({
             journeyDate: iso(l.journeyDate),
             returnDate: iso(l.returnDate),
           })),
+          payment: paymentPayload(v.payment, canReceive && receive && post, iso),
           post,
         };
         startTransition(async () => {
@@ -191,15 +210,22 @@ export function ReissueInvoiceForm({
             mode === "create"
               ? await createInvoiceAction("REISSUE", payload)
               : await updateInvoiceAction("REISSUE", invoiceId!, payload);
-          if (!applyActionResult(result, form, message)) return;
+          if (!applyActionResult(result, form, message)) {
+            printed.cancel();
+            return;
+          }
           const id =
             mode === "create" && result.ok ? (result.data as { id: string }).id : invoiceId!;
           message.success(post ? "Reissue saved and posted" : "Reissue saved as draft");
+          printed.show(id);
           router.push(`/invoices/reissue/${id}`);
           router.refresh();
         });
       })
-      .catch(() => message.error("Please fix the highlighted fields"));
+      .catch(() => {
+        printed.cancel();
+        message.error("Please fix the highlighted fields");
+      });
   }
 
   return (
@@ -218,6 +244,10 @@ export function ReissueInvoiceForm({
         layout="vertical"
         requiredMark="optional"
         scrollToFirstError
+        onValuesChange={(changed: Partial<FormValues>) => {
+          const method = methodForAccount(accounts, changed.payment?.moneyAccountId);
+          if (method) form.setFieldValue(["payment", "paymentMethod"], method);
+        }}
         initialValues={
           initial
             ? {
@@ -230,156 +260,185 @@ export function ReissueInvoiceForm({
                   returnDate: l.returnDate ? dayjs(l.returnDate) : null,
                 })),
               }
-            : { date: dayjs(today), clientId: presetClient ?? null, lines: [{}] }
+            : {
+                date: dayjs(today),
+                clientId: presetClient ?? null,
+                lines: [{}],
+                showDiscount: true,
+                payment: { date: dayjs(today) },
+              }
         }
       >
-        <InvoiceHeaderCard
-          formName="reissueInvoice"
-          invoiceType="REISSUE"
-          allowNewClient={false}
-          employees={employees}
-        />
-
-        <Card title="Tickets" style={{ marginBottom: 16 }}>
-          {clientId && !loading && tickets.length === 0 && (
-            <Alert
-              type="info"
-              showIcon
-              style={{ marginBottom: 16 }}
-              message="This client has no posted air tickets that can be reissued."
+        <div className="inv-layout">
+          <div className="inv-main">
+            <InvoiceHeaderCard
+              formName="reissueInvoice"
+              invoiceType="REISSUE"
+              allowNewClient={false}
+              employees={employees}
             />
-          )}
-          <Form.List name="lines">
-            {(fields, { add, remove }) => (
-              <>
-                {fields.map((field, index) => {
-                  const f = lineFigures(values?.lines?.[index]);
-                  return (
-                    <div
-                      key={field.key}
-                      style={{
-                        borderBottom: "1px solid #f0f0f0",
-                        paddingBottom: 8,
-                        marginBottom: 12,
-                      }}
-                    >
-                      <Row gutter={10} align="bottom" className="line-row">
-                        <Col xs={24} xl={10}>
-                          <Form.Item
-                            label="Original ticket"
-                            name={[field.name, "originalTicketId"]}
-                            rules={[{ required: true, message: "Choose the ticket" }]}
-                          >
-                            <Select
-                              showSearch
-                              optionFilterProp="label"
-                              loading={loading}
-                              disabled={!clientId}
-                              placeholder={
-                                clientId ? "Ticket no. or passenger" : "Choose the client first"
-                              }
-                              options={ticketOptions}
-                              onChange={(id: string) => onPickTicket(index, id)}
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={12} md={6} xl={3}>
-                          <Form.Item label="New ticket no." name={[field.name, "ticketNo"]}>
-                            <Input maxLength={20} />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={12} md={6} xl={3}>
-                          <Form.Item label="PNR" name={[field.name, "pnr"]}>
-                            <Input maxLength={20} style={{ textTransform: "uppercase" }} />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12} xl={8}>
-                          <Form.Item
-                            label="Vendor"
-                            name={[field.name, "vendorId"]}
-                            rules={[{ required: true, message: "Choose the vendor" }]}
-                          >
-                            <PartySelect party="vendors" />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={12} md={6} xl={4}>
-                          <Form.Item
-                            label="New journey date"
-                            name={[field.name, "journeyDate"]}
-                            rules={[{ required: true, message: "Required" }]}
-                          >
-                            <DatePicker format="DD MMM YYYY" style={{ width: "100%" }} />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={12} md={6} xl={4}>
-                          <Form.Item label="New return date" name={[field.name, "returnDate"]}>
-                            <DatePicker format="DD MMM YYYY" style={{ width: "100%" }} />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={12} md={6} xl={4}>
-                          <Form.Item label="Airline penalty" name={[field.name, "penalty"]}>
-                            <MoneyInput placeholder="0.00" />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={12} md={6} xl={4}>
-                          <Form.Item label="Fare difference" name={[field.name, "fareDifference"]}>
-                            <MoneyInput placeholder="0.00" />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={12} md={6} xl={3}>
-                          <Form.Item label="Service charge" name={[field.name, "serviceCharge"]}>
-                            <MoneyInput placeholder="0.00" />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={12} md={6} xl={1}>
-                          <Form.Item label=" ">
-                            <Button
-                              danger
-                              icon={<DeleteOutlined />}
-                              aria-label={`Remove ticket ${index + 1}`}
-                              disabled={fields.length === 1}
-                              onClick={() => remove(field.name)}
-                            />
-                          </Form.Item>
-                        </Col>
-                      </Row>
-                      <Space size="large" style={{ fontSize: 12 }}>
-                        <Typography.Text type="secondary">
-                          Client pays {f ? formatMoney(f.clientPrice.toFixed(2)) : "-"}
-                        </Typography.Text>
-                        <Typography.Text type="secondary">
-                          Vendor gets {f ? formatMoney(f.purchasePrice.toFixed(2)) : "-"}
-                        </Typography.Text>
-                        <Typography.Text type="success">
-                          Profit {f ? formatMoney(f.profit.toFixed(2)) : "-"}
-                        </Typography.Text>
-                      </Space>
-                    </div>
-                  );
-                })}
-                <Button type="dashed" block icon={<PlusOutlined />} onClick={() => add({})}>
-                  Add ticket
-                </Button>
-              </>
+
+            <Card title="Tickets" style={{ marginBottom: 16 }}>
+              {clientId && !loading && tickets.length === 0 && (
+                <Alert
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                  message="This client has no posted air tickets that can be reissued."
+                />
+              )}
+              <Form.List name="lines">
+                {(fields, { add, remove }) => (
+                  <>
+                    {fields.map((field, index) => {
+                      const f = lineFigures(values?.lines?.[index]);
+                      return (
+                        <div
+                          key={field.key}
+                          style={{
+                            borderBottom: "1px solid #f0f0f0",
+                            paddingBottom: 8,
+                            marginBottom: 12,
+                          }}
+                        >
+                          <Row gutter={10} align="bottom" className="line-row">
+                            <Col xs={24} xxl={10}>
+                              <Form.Item
+                                label="Original ticket"
+                                name={[field.name, "originalTicketId"]}
+                                rules={[{ required: true, message: "Choose the ticket" }]}
+                              >
+                                <Select
+                                  showSearch
+                                  optionFilterProp="label"
+                                  loading={loading}
+                                  disabled={!clientId}
+                                  placeholder={
+                                    clientId ? "Ticket no. or passenger" : "Choose the client first"
+                                  }
+                                  options={ticketOptions}
+                                  onChange={(id: string) => onPickTicket(index, id)}
+                                />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={6} xxl={3}>
+                              <Form.Item label="New ticket no." name={[field.name, "ticketNo"]}>
+                                <Input maxLength={20} />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={6} xxl={3}>
+                              <Form.Item label="PNR" name={[field.name, "pnr"]}>
+                                <Input maxLength={20} style={{ textTransform: "uppercase" }} />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12} xxl={8}>
+                              <Form.Item
+                                label="Vendor"
+                                name={[field.name, "vendorId"]}
+                                rules={[{ required: true, message: "Choose the vendor" }]}
+                              >
+                                <PartySelect party="vendors" />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={6} xxl={4}>
+                              <Form.Item
+                                label="New journey date"
+                                name={[field.name, "journeyDate"]}
+                                rules={[{ required: true, message: "Required" }]}
+                              >
+                                <DatePicker format="DD MMM YYYY" style={{ width: "100%" }} />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={6} xxl={4}>
+                              <Form.Item label="New return date" name={[field.name, "returnDate"]}>
+                                <DatePicker format="DD MMM YYYY" style={{ width: "100%" }} />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={6} xxl={4}>
+                              <Form.Item label="Airline penalty" name={[field.name, "penalty"]}>
+                                <MoneyInput placeholder="0.00" />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={6} xxl={4}>
+                              <Form.Item
+                                label="Fare difference"
+                                name={[field.name, "fareDifference"]}
+                              >
+                                <MoneyInput placeholder="0.00" />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={6} xxl={3}>
+                              <Form.Item
+                                label="Service charge"
+                                name={[field.name, "serviceCharge"]}
+                              >
+                                <MoneyInput placeholder="0.00" />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={6} xxl={1}>
+                              <Form.Item label=" ">
+                                <Button
+                                  danger
+                                  icon={<DeleteOutlined />}
+                                  aria-label={`Remove ticket ${index + 1}`}
+                                  disabled={fields.length === 1}
+                                  onClick={() => remove(field.name)}
+                                />
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                          <Space size="large" style={{ fontSize: 12 }}>
+                            <Typography.Text type="secondary">
+                              Client pays {f ? formatMoney(f.clientPrice.toFixed(2)) : "-"}
+                            </Typography.Text>
+                            <Typography.Text type="secondary">
+                              Vendor gets {f ? formatMoney(f.purchasePrice.toFixed(2)) : "-"}
+                            </Typography.Text>
+                            <Typography.Text type="success">
+                              Profit {f ? formatMoney(f.profit.toFixed(2)) : "-"}
+                            </Typography.Text>
+                          </Space>
+                        </div>
+                      );
+                    })}
+                    <Button type="dashed" block icon={<PlusOutlined />} onClick={() => add({})}>
+                      Add ticket
+                    </Button>
+                  </>
+                )}
+              </Form.List>
+            </Card>
+
+            {canReceive && (
+              <ReceivePaymentCard accounts={accounts} on={receive} onChange={setReceive} />
             )}
-          </Form.List>
-        </Card>
+          </div>
+          <InvoiceSummaryAside
+            rows={(values?.lines ?? []).map((l, i) => {
+              const f = lineFigures(l);
+              return {
+                key: i,
+                label:
+                  tickets.find((t) => t.id === l?.originalTicketId)?.ticketNo ?? `Ticket ${i + 1}`,
+                sub: l?.ticketNo ? `New ${l.ticketNo}` : null,
+                sales: f ? formatMoney(f.clientPrice.toFixed(2)) : null,
+                profit: f ? f.clientPrice.minus(f.purchasePrice) : null,
+              };
+            })}
+            rowsTitle="Reissue"
+            totals={totals}
+            received={receive ? d(values?.payment?.amount) : null}
+          />
+        </div>
 
-        <InvoiceTotalsCard totals={totals} />
-
-        <Flex gap={8} justify="flex-end" style={{ marginBottom: 24 }}>
-          <Link href={invoiceId ? `/invoices/reissue/${invoiceId}` : "/invoices/reissue"}>
-            <Button>Cancel</Button>
-          </Link>
-          {(mode === "create" || isDraft) && (
-            <Button loading={pending} onClick={() => submit(false)}>
-              Save as draft
-            </Button>
-          )}
-          <Button type="primary" loading={pending} onClick={() => submit(true)}>
-            {mode === "edit" && !isDraft ? "Save changes" : "Save & post"}
-          </Button>
-        </Flex>
+        <InvoiceActionBar
+          summary={`${(values?.lines ?? []).length} reissue${(values?.lines ?? []).length === 1 ? "" : "s"}`}
+          cancelHref={invoiceId ? `/invoices/reissue/${invoiceId}` : "/invoices/reissue"}
+          showDraft={mode === "create" || isDraft === true}
+          pending={pending}
+          primaryLabel={mode === "edit" && !isDraft ? "Save changes" : "Save & post"}
+          onSubmit={submit}
+        />
       </Form>
     </>
   );

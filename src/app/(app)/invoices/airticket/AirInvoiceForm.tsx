@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   App,
@@ -15,18 +14,11 @@ import {
   Row,
   Select,
   Space,
-  Switch,
-  Table,
   Tag,
   Tooltip,
   Typography,
 } from "antd";
-import {
-  CopyOutlined,
-  DeleteOutlined,
-  MinusCircleOutlined,
-  PlusOutlined,
-} from "@ant-design/icons";
+import { CopyOutlined, DeleteOutlined, MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import { calcAirTicket } from "@/lib/calc/airTicket";
 import { calcInvoiceTotals } from "@/lib/calc/invoiceTotals";
@@ -38,9 +30,19 @@ import type { AirPricingSettings } from "@/server/services/invoices/airInvoiceSe
 import { MoneyInput } from "@/components/MoneyInput";
 import { PageHeader } from "@/components/PageHeader";
 import { PartySelect } from "@/components/PartySelect";
-import { THEME } from "@/components/Providers";
 import { applyActionResult } from "@/components/formResult";
 import { ClientField } from "@/components/invoices/ClientField";
+import {
+  InvoiceActionBar,
+  InvoiceSummaryAside,
+  MoneyLine as Line,
+  ReceivePaymentCard,
+  methodForAccount,
+  openPrintWindow,
+  paymentPayload,
+  type AccountOption,
+  type PaymentFormValues,
+} from "@/components/invoices/InvoiceFormParts";
 import { INVOICE_TYPE_INFO } from "@/lib/invoiceTypes";
 import { createInvoiceAction, updateInvoiceAction } from "../invoiceActions";
 
@@ -79,13 +81,7 @@ interface TicketForm {
   segments?: SegmentForm[];
 }
 
-interface PaymentForm {
-  moneyAccountId?: string;
-  paymentMethod?: string;
-  amount?: string | null;
-  date?: Dayjs | null;
-  reference?: string | null;
-}
+type PaymentForm = PaymentFormValues;
 
 interface InvoiceForm {
   clientId?: string | null;
@@ -132,11 +128,7 @@ export interface AirInvoiceFormValues {
   })[];
 }
 
-export interface AccountOption {
-  value: string;
-  label: string;
-  kind: string;
-}
+export type { AccountOption };
 
 interface Props {
   /** AIR = commission & AIT worked out; NON_COMMISSION = purchase price entered directly. */
@@ -153,13 +145,6 @@ interface Props {
   /** Accounts money can go into; empty when the user may not take payments. */
   accounts?: AccountOption[];
 }
-
-const METHOD_BY_KIND: Record<string, string> = {
-  CASH: "CASH",
-  BANK: "BANK",
-  MOBILE_BANKING: "MOBILE",
-  CREDIT_CARD: "CARD",
-};
 
 const emptyTicket = (today: string): TicketForm => ({
   passengerType: "ADT",
@@ -194,28 +179,6 @@ function safeCalc<T>(fn: () => T): T | null {
   } catch {
     return null;
   }
-}
-
-/** Label / value row of the money panels. */
-function Line({
-  label,
-  value,
-  strong,
-  tone,
-}: {
-  label: string;
-  value: string;
-  strong?: boolean;
-  tone?: "success" | "danger";
-}) {
-  return (
-    <Flex justify="space-between" style={{ fontSize: 14, fontWeight: strong ? 600 : 400 }}>
-      <span>{label}</span>
-      <Typography.Text strong={strong} type={tone} style={{ fontVariantNumeric: "tabular-nums" }}>
-        {value}
-      </Typography.Text>
-    </Flex>
-  );
 }
 
 export function AirInvoiceForm(props: Props) {
@@ -283,14 +246,12 @@ export function AirInvoiceForm(props: Props) {
   );
 
   const received = receive ? d(values?.payment?.amount) : d(0);
-  const due = totals ? d(totals.netTotal.toFixed(2)).minus(received) : null;
 
   /** Fill commission % from the airline default the first time an airline is picked. */
   function onValuesChange(changed: Partial<InvoiceForm>) {
     if (changed.payment?.moneyAccountId) {
-      const kind = accounts.find((a) => a.value === changed.payment!.moneyAccountId)?.kind;
-      if (kind && METHOD_BY_KIND[kind])
-        form.setFieldValue(["payment", "paymentMethod"], METHOD_BY_KIND[kind]);
+      const method = methodForAccount(accounts, changed.payment.moneyAccountId);
+      if (method) form.setFieldValue(["payment", "paymentMethod"], method);
     }
     const changedTickets = changed.tickets;
     if (!changedTickets || nonCommission) return;
@@ -305,8 +266,7 @@ export function AirInvoiceForm(props: Props) {
   }
 
   function submit(post: boolean, preview = false) {
-    // Opened now (inside the click) so the browser does not block it as a pop-up.
-    const pdfWindow = preview ? window.open("about:blank", "_blank") : null;
+    const printed = openPrintWindow(preview);
     form
       .validateFields()
       .then((v) => {
@@ -321,10 +281,7 @@ export function AirInvoiceForm(props: Props) {
             issueDate: iso(t.issueDate),
             segments: (t.segments ?? []).map((s) => ({ ...s, date: iso(s.date) })),
           })),
-          payment:
-            canReceive && receive && post && v.payment
-              ? { ...v.payment, date: iso(v.payment.date) }
-              : null,
+          payment: paymentPayload(v.payment, canReceive && receive && post, iso),
           post,
         };
         startTransition(async () => {
@@ -333,19 +290,19 @@ export function AirInvoiceForm(props: Props) {
               ? await createInvoiceAction(type, payload)
               : await updateInvoiceAction(type, invoiceId!, payload);
           if (!applyActionResult(result, form, message)) {
-            pdfWindow?.close();
+            printed.cancel();
             return;
           }
           const id =
             mode === "create" && result.ok ? (result.data as { id: string }).id : invoiceId!;
           message.success(post ? "Invoice saved and posted" : "Invoice saved as draft");
-          if (pdfWindow) pdfWindow.location.href = `/api/pdf/invoice/${id}`;
+          printed.show(id);
           router.push(`${basePath}/${id}`);
           router.refresh();
         });
       })
       .catch(() => {
-        pdfWindow?.close();
+        printed.cancel();
         message.error("Please fix the highlighted fields");
       });
   }
@@ -355,9 +312,9 @@ export function AirInvoiceForm(props: Props) {
 
   const summaryRows = (values?.tickets ?? []).map((t, i) => ({
     key: i,
-    ticket: t?.ticketNo || `Ticket ${i + 1}`,
-    passenger: t?.passengerName ?? "",
-    sales: t?.clientPrice ? formatMoney(d(t.clientPrice).toFixed(2)) : "-",
+    label: t?.ticketNo || `Ticket ${i + 1}`,
+    sub: t?.passengerName ?? null,
+    sales: t?.clientPrice ? formatMoney(d(t.clientPrice).toFixed(2)) : null,
     profit: priced[i]?.profit ?? null,
   }));
 
@@ -453,7 +410,10 @@ export function AirInvoiceForm(props: Props) {
                   {fields.map((field, index) => {
                     const p = priced[index];
                     const t = values?.tickets?.[index];
-                    const heading = [t?.route, airlines.find((a) => a.value === t?.airlineId)?.label]
+                    const heading = [
+                      t?.route,
+                      airlines.find((a) => a.value === t?.airlineId)?.label,
+                    ]
                       .filter(Boolean)
                       .join(" · ");
                     return (
@@ -609,7 +569,9 @@ export function AirInvoiceForm(props: Props) {
                                 <Form.Item
                                   label="Base fare"
                                   name={[field.name, "baseFare"]}
-                                  rules={nonCommission ? [] : [{ required: true, message: "Required" }]}
+                                  rules={
+                                    nonCommission ? [] : [{ required: true, message: "Required" }]
+                                  }
                                 >
                                   <MoneyInput />
                                 </Form.Item>
@@ -637,7 +599,10 @@ export function AirInvoiceForm(props: Props) {
                                               noStyle
                                               rules={[{ required: true }]}
                                             >
-                                              <MoneyInput style={{ width: 110 }} placeholder="0.00" />
+                                              <MoneyInput
+                                                style={{ width: 110 }}
+                                                placeholder="0.00"
+                                              />
                                             </Form.Item>
                                             <Button
                                               icon={<MinusCircleOutlined />}
@@ -701,7 +666,10 @@ export function AirInvoiceForm(props: Props) {
                             <Line label="Total fare" value={money(p?.totalFare)} />
                             {!nonCommission && (
                               <>
-                                <Line label="Commission" value={`- ${money(p?.commissionAmount)}`} />
+                                <Line
+                                  label="Commission"
+                                  value={`- ${money(p?.commissionAmount)}`}
+                                />
                                 <Line label="AIT" value={`+ ${money(p?.aitAmount)}`} />
                               </>
                             )}
@@ -709,7 +677,9 @@ export function AirInvoiceForm(props: Props) {
                             <Line label="We pay" value={money(p?.purchasePrice)} strong />
                             <Line
                               label="Client pays"
-                              value={t?.clientPrice ? formatMoney(d(t.clientPrice).toFixed(2)) : "-"}
+                              value={
+                                t?.clientPrice ? formatMoney(d(t.clientPrice).toFixed(2)) : "-"
+                              }
                               strong
                             />
                             <div
@@ -748,16 +718,20 @@ export function AirInvoiceForm(props: Props) {
                         <Form.List name={[field.name, "segments"]}>
                           {(segs, seg) => (
                             <>
-                              {segs.length > 0 && (
-                                <div className="inv-subhead">Flight details</div>
-                              )}
+                              {segs.length > 0 && <div className="inv-subhead">Flight details</div>}
                               {segs.map((sf) => (
                                 <Row gutter={8} key={sf.key} align="bottom">
                                   <Col xs={6} md={3}>
                                     <Form.Item
                                       label="From"
                                       name={[sf.name, "from"]}
-                                      rules={[{ required: true, pattern: /^[A-Za-z]{3}$/, message: "e.g. DAC" }]}
+                                      rules={[
+                                        {
+                                          required: true,
+                                          pattern: /^[A-Za-z]{3}$/,
+                                          message: "e.g. DAC",
+                                        },
+                                      ]}
                                     >
                                       <Input maxLength={3} style={{ textTransform: "uppercase" }} />
                                     </Form.Item>
@@ -766,7 +740,13 @@ export function AirInvoiceForm(props: Props) {
                                     <Form.Item
                                       label="To"
                                       name={[sf.name, "to"]}
-                                      rules={[{ required: true, pattern: /^[A-Za-z]{3}$/, message: "e.g. DXB" }]}
+                                      rules={[
+                                        {
+                                          required: true,
+                                          pattern: /^[A-Za-z]{3}$/,
+                                          message: "e.g. DXB",
+                                        },
+                                      ]}
                                     >
                                       <Input maxLength={3} style={{ textTransform: "uppercase" }} />
                                     </Form.Item>
@@ -778,7 +758,10 @@ export function AirInvoiceForm(props: Props) {
                                   </Col>
                                   <Col xs={6} md={3}>
                                     <Form.Item label="Flight no." name={[sf.name, "flightNo"]}>
-                                      <Input maxLength={10} style={{ textTransform: "uppercase" }} />
+                                      <Input
+                                        maxLength={10}
+                                        style={{ textTransform: "uppercase" }}
+                                      />
                                     </Form.Item>
                                   </Col>
                                   <Col xs={12} md={5}>
@@ -790,7 +773,9 @@ export function AirInvoiceForm(props: Props) {
                                     <Form.Item
                                       label="Departs"
                                       name={[sf.name, "departs"]}
-                                      rules={[{ pattern: /^([01]\d|2[0-3]):[0-5]\d$/, message: "HH:MM" }]}
+                                      rules={[
+                                        { pattern: /^([01]\d|2[0-3]):[0-5]\d$/, message: "HH:MM" },
+                                      ]}
                                     >
                                       <Input placeholder="10:35" maxLength={5} />
                                     </Form.Item>
@@ -799,7 +784,9 @@ export function AirInvoiceForm(props: Props) {
                                     <Form.Item
                                       label="Arrives"
                                       name={[sf.name, "arrives"]}
-                                      rules={[{ pattern: /^([01]\d|2[0-3]):[0-5]\d$/, message: "HH:MM" }]}
+                                      rules={[
+                                        { pattern: /^([01]\d|2[0-3]):[0-5]\d$/, message: "HH:MM" },
+                                      ]}
                                     >
                                       <Input placeholder="13:55" maxLength={5} />
                                     </Form.Item>
@@ -850,223 +837,27 @@ export function AirInvoiceForm(props: Props) {
             </Form.List>
 
             {canReceive && (
-              <Card
-                style={{ marginBottom: 16 }}
-                title={
-                  <Flex justify="space-between" align="center">
-                    <span>
-                      Receive payment now
-                      <Typography.Text
-                        type="secondary"
-                        style={{ fontWeight: 400, fontSize: 13, marginLeft: 8 }}
-                      >
-                        A money receipt is made with the invoice
-                      </Typography.Text>
-                    </span>
-                    <Switch
-                      checked={receive}
-                      onChange={setReceive}
-                      aria-label="Receive payment now"
-                    />
-                  </Flex>
-                }
-                styles={{ body: receive ? undefined : { display: "none" } }}
-              >
-                {receive && (
-                  <Row gutter={16}>
-                    <Col xs={24} md={8}>
-                      <Form.Item
-                        label="Into account"
-                        name={["payment", "moneyAccountId"]}
-                        rules={[{ required: true, message: "Choose the account" }]}
-                      >
-                        <Select options={accounts} placeholder="Cash, bank, bKash…" />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={12} md={5}>
-                      <Form.Item
-                        label="Method"
-                        name={["payment", "paymentMethod"]}
-                        rules={[{ required: true, message: "Choose how" }]}
-                      >
-                        <Select
-                          options={[
-                            { value: "CASH", label: "Cash" },
-                            { value: "BANK", label: "Bank" },
-                            { value: "MOBILE", label: "Mobile banking" },
-                            { value: "CARD", label: "Card" },
-                          ]}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={12} md={5}>
-                      <Form.Item
-                        label="Payment amount"
-                        name={["payment", "amount"]}
-                        rules={[{ required: true, message: "Enter the amount" }]}
-                      >
-                        <MoneyInput placeholder="0.00" />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={12} md={6}>
-                      <Form.Item label="Payment date" name={["payment", "date"]}>
-                        <DatePicker format="DD MMM YYYY" style={{ width: "100%" }} />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={12} md={8}>
-                      <Form.Item label="Payment reference" name={["payment", "reference"]}>
-                        <Input maxLength={80} placeholder="Transaction ID, slip no." />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-                )}
-              </Card>
+              <ReceivePaymentCard accounts={accounts} on={receive} onChange={setReceive} />
             )}
           </div>
 
-          <aside className="inv-aside">
-            <Card
-              title="Summary"
-              style={{ marginBottom: 16 }}
-              styles={{ body: { padding: 0 } }}
-              extra={
-                due && due.greaterThan(0) ? (
-                  <Tag color="red">Due {formatMoney(due.toFixed(2))}</Tag>
-                ) : due && totals && d(totals.netTotal.toFixed(2)).greaterThan(0) ? (
-                  <Tag color="green">Paid in full</Tag>
-                ) : null
-              }
-            >
-              <Table
-                size="small"
-                pagination={false}
-                dataSource={summaryRows}
-                columns={[
-                  {
-                    title: "Ticket",
-                    dataIndex: "ticket",
-                    render: (v: string, r) => (
-                      <span>
-                        {v}
-                        {r.passenger && (
-                          <Typography.Text
-                            type="secondary"
-                            style={{ display: "block", fontSize: 12 }}
-                          >
-                            {r.passenger}
-                          </Typography.Text>
-                        )}
-                      </span>
-                    ),
-                  },
-                  { title: "Sales", dataIndex: "sales", align: "right" },
-                  {
-                    title: "Profit",
-                    dataIndex: "profit",
-                    align: "right",
-                    render: (v: { isNegative(): boolean; toFixed(n: number): string } | null) =>
-                      v ? (
-                        <Typography.Text type={v.isNegative() ? "danger" : "success"}>
-                          {formatMoney(v.toFixed(2))}
-                        </Typography.Text>
-                      ) : (
-                        "-"
-                      ),
-                  },
-                ]}
-              />
-              <div style={{ padding: "16px 20px", display: "grid", gap: 12 }}>
-                <Line label="Subtotal" value={money(totals?.subtotal)} />
-                <Row gutter={8}>
-                  <Col span={8}>
-                    <Form.Item label="Discount" name="discount" style={{ marginBottom: 0 }}>
-                      <MoneyInput placeholder="0.00" />
-                    </Form.Item>
-                  </Col>
-                  <Col span={8}>
-                    <Form.Item label="Service charge" name="serviceCharge" style={{ marginBottom: 0 }}>
-                      <MoneyInput placeholder="0.00" />
-                    </Form.Item>
-                  </Col>
-                  <Col span={8}>
-                    <Form.Item label="VAT" name="vat" style={{ marginBottom: 0 }}>
-                      <MoneyInput placeholder="0.00" />
-                    </Form.Item>
-                  </Col>
-                </Row>
-                <Flex
-                  justify="space-between"
-                  align="baseline"
-                  style={{ borderTop: `1px solid ${THEME.line}`, paddingTop: 12 }}
-                >
-                  <span style={{ fontWeight: 600 }}>Net total</span>
-                  <span style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                    {money(totals?.netTotal)}
-                  </span>
-                </Flex>
-                {receive && <Line label="Received now" value={`- ${money(received)}`} />}
-                <Line
-                  label="Invoice due"
-                  value={money(due)}
-                  strong
-                  tone={due && due.greaterThan(0) ? "danger" : undefined}
-                />
-                <Line label="Payable to vendors" value={money(totals?.totalCost)} />
-                <Line
-                  label="Profit"
-                  value={money(totals?.profit)}
-                  strong
-                  tone={totals && d(totals.profit).isNegative() ? "danger" : "success"}
-                />
-              </div>
-            </Card>
-
-            <Card title="On the printed invoice" size="small" style={{ marginBottom: 16 }}>
-              {(
-                [
-                  ["showPrevDue", "Show previous due"],
-                  ["showDiscount", "Show discount"],
-                  ["showExtraFee", "Show extra fee"],
-                ] as const
-              ).map(([name, label]) => (
-                <Flex key={name} justify="space-between" align="center" style={{ marginBottom: 10 }}>
-                  <span>{label}</span>
-                  <Form.Item name={name} valuePropName="checked" noStyle>
-                    <Switch size="small" aria-label={label} />
-                  </Form.Item>
-                </Flex>
-              ))}
-              <Form.Item label="Reference" name="reference">
-                <Input maxLength={100} placeholder="e.g. corporate PO number" />
-              </Form.Item>
-              <Form.Item label="Note" name="note" style={{ marginBottom: 0 }}>
-                <Input.TextArea rows={2} maxLength={1000} placeholder="Shown on the invoice" />
-              </Form.Item>
-            </Card>
-          </aside>
+          <InvoiceSummaryAside
+            rows={summaryRows}
+            rowsTitle="Ticket"
+            totals={totals}
+            received={receive ? received : null}
+            showExtraFeeOption
+          />
         </div>
 
-        <div className="inv-actions">
-          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-            {(values?.tickets ?? []).length} ticket
-            {(values?.tickets ?? []).length === 1 ? "" : "s"} · Net {money(totals?.netTotal)}
-          </Typography.Text>
-          <div style={{ flex: 1 }} />
-          <Link href={invoiceId ? `${basePath}/${invoiceId}` : basePath}>
-            <Button>Cancel</Button>
-          </Link>
-          {(mode === "create" || isDraft) && (
-            <Button loading={pending} onClick={() => submit(false)}>
-              Save as draft
-            </Button>
-          )}
-          <Button type="primary" ghost loading={pending} onClick={() => submit(true, true)}>
-            Post and print
-          </Button>
-          <Button type="primary" loading={pending} onClick={() => submit(true)}>
-            {mode === "edit" && !isDraft ? "Save changes" : "Save & post"}
-          </Button>
-        </div>
+        <InvoiceActionBar
+          summary={`${(values?.tickets ?? []).length} ticket${(values?.tickets ?? []).length === 1 ? "" : "s"} · Net ${money(totals?.netTotal)}`}
+          cancelHref={invoiceId ? `${basePath}/${invoiceId}` : basePath}
+          showDraft={mode === "create" || isDraft === true}
+          pending={pending}
+          primaryLabel={mode === "edit" && !isDraft ? "Save changes" : "Save & post"}
+          onSubmit={submit}
+        />
       </Form>
     </>
   );

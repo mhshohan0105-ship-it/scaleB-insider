@@ -311,3 +311,11 @@ Verified: `npm run check` green (218 unit + 133 integration, 6 new), Playwright 
 - Visa, item and reissue invoice views return the reference and print choices too.
 
 Verified: `npm run check` green (218 unit + 133 integration), Playwright 28/28. Checked in the browser: live per-ticket figures, summary, and the PDF with flights, fee, reference and previous due.
+
+## Every invoice form in the new layout (2026-10-26)
+
+- Visa, reissue and item invoices (other, other package, tour, umrah, hajj pre-registration, hajj) use the same layout as the air ticket form: main column, sticky summary (lines with sales and profit, discount, service charge, VAT, net total, due, payable, profit), printed-invoice choices with reference and note, "Receive payment now", and the sticky action bar with "Post and print".
+- Shared parts in `src/components/invoices/InvoiceFormParts.tsx`; the old totals card is gone. Wide-screen column spans now start at 1600 px so fields fit the narrower main column.
+- Fix: "(optional)" marks are hidden in the summary and dense line rows (antd's style was winning).
+
+Verified: `npm run check` green (218 unit + 133 integration), Playwright 28/28.

@@ -179,7 +179,7 @@ body {
 
 /* Invoice line rows are dense; the "(optional)" hint would wrap the labels. */
 .line-row .ant-form-item .ant-form-item-label > label .ant-form-item-optional {
-  display: none;
+  display: none !important;
 }
 
 /* Public invoice check (QR code) */
@@ -375,5 +375,5 @@ body {
 }
 
 .inv-aside .ant-form-item-label > label .ant-form-item-optional {
-  display: none;
+  display: none !important;
 }

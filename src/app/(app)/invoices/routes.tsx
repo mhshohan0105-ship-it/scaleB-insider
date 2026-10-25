@@ -31,6 +31,7 @@ import { getVisaInvoice, visaFormValues } from "@/server/services/invoices/visaI
 import { invoiceRefunds } from "@/server/services/refund/postRefund";
 import { pilgrimOptions } from "@/server/services/hajj/pilgrimService";
 import { masterOptions } from "@/server/services/masters/masterService";
+import { listMoneyAccounts } from "@/server/services/accounts/moneyAccountService";
 import type { RawSearchParams } from "../loadEntityPage";
 import { AirInvoiceForm } from "./airticket/AirInvoiceForm";
 import { AirInvoiceView } from "./airticket/[id]/AirInvoiceView";
@@ -91,6 +92,13 @@ async function itemOptions(ctx: ServiceContext, type: ItemFormType, pilgrimIds: 
   return { employees, products, groups, roomTypes, tourGroups, itinerary, pilgrims };
 }
 
+/** Accounts for "Receive payment now" (none when the user may not take payments). */
+async function paymentAccounts(ctx: ServiceContext, canReceive: boolean) {
+  if (!canReceive) return [];
+  const list = await listMoneyAccounts(ctx, { activeOnly: true });
+  return list.map((a) => ({ value: a.id, label: a.name, kind: a.kind }));
+}
+
 async function visaOptions(ctx: ServiceContext) {
   const [employees, visaTypes, countries] = await Promise.all([
     masterOptions(ctx, "employees"),
@@ -115,13 +123,22 @@ export async function renderNewInvoice(type: InvoiceTypeKey) {
       />
     );
   }
+  const accounts = await paymentAccounts(a.ctx, a.canReceive);
   if (kind === "visa")
-    return <VisaInvoiceForm mode="create" today={today} {...await visaOptions(a.ctx)} />;
+    return (
+      <VisaInvoiceForm
+        mode="create"
+        today={today}
+        accounts={accounts}
+        {...await visaOptions(a.ctx)}
+      />
+    );
   if (kind === "reissue")
     return (
       <ReissueInvoiceForm
         mode="create"
         today={today}
+        accounts={accounts}
         employees={await masterOptions(a.ctx, "employees")}
       />
     );
@@ -131,6 +148,7 @@ export async function renderNewInvoice(type: InvoiceTypeKey) {
       type={itemType}
       mode="create"
       today={today}
+      accounts={accounts}
       options={await itemOptions(a.ctx, itemType)}
     />
   );

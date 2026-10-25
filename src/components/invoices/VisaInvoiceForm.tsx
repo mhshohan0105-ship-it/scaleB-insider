@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useTransition } from "react";
-import Link from "next/link";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   App,
@@ -10,7 +9,6 @@ import {
   Card,
   Col,
   DatePicker,
-  Flex,
   Form,
   Input,
   Row,
@@ -31,7 +29,16 @@ import { PartySelect } from "@/components/PartySelect";
 import { applyActionResult } from "@/components/formResult";
 import { createInvoiceAction, updateInvoiceAction } from "@/app/(app)/invoices/invoiceActions";
 import { InvoiceHeaderCard } from "./InvoiceHeaderCard";
-import { InvoiceTotalsCard } from "./InvoiceTotalsCard";
+import {
+  InvoiceActionBar,
+  InvoiceSummaryAside,
+  ReceivePaymentCard,
+  methodForAccount,
+  openPrintWindow,
+  paymentPayload,
+  type AccountOption,
+  type PaymentFormValues,
+} from "./InvoiceFormParts";
 import { VISA_STATUS_LABEL } from "./visaStatus";
 
 interface Line {
@@ -60,6 +67,10 @@ interface FormValues {
   serviceCharge?: string | null;
   vat?: string | null;
   note?: string | null;
+  reference?: string | null;
+  showPrevDue?: boolean;
+  showDiscount?: boolean;
+  payment?: PaymentFormValues;
   lines?: Line[];
 }
 
@@ -79,6 +90,8 @@ interface Props {
   employees: FieldOption[];
   visaTypes: FieldOption[];
   countries: FieldOption[];
+  /** Accounts money can go into; empty when the user may not take payments. */
+  accounts?: AccountOption[];
 }
 
 const iso = (v?: Dayjs | null) => (v ? v.format("YYYY-MM-DD") : null);
@@ -93,12 +106,15 @@ export function VisaInvoiceForm({
   employees,
   visaTypes,
   countries,
+  accounts = [],
 }: Props) {
   const router = useRouter();
   const { message } = App.useApp();
   const [form] = Form.useForm<FormValues>();
   const [pending, startTransition] = useTransition();
   const values = Form.useWatch([], form) as FormValues | undefined;
+  const [receive, setReceive] = useState(false);
+  const canReceive = mode === "create" && accounts.length > 0;
 
   const totals = useMemo(() => {
     try {
@@ -117,7 +133,8 @@ export function VisaInvoiceForm({
     }
   }, [values]);
 
-  function submit(post: boolean) {
+  function submit(post: boolean, print = false) {
+    const printed = openPrintWindow(print);
     form
       .validateFields()
       .then((v) => {
@@ -130,6 +147,7 @@ export function VisaInvoiceForm({
             void _status;
             return { ...rest, expectedDate: iso(l.expectedDate) };
           }),
+          payment: paymentPayload(v.payment, canReceive && receive && post, iso),
           post,
         };
         startTransition(async () => {
@@ -137,15 +155,22 @@ export function VisaInvoiceForm({
             mode === "create"
               ? await createInvoiceAction("VISA", payload)
               : await updateInvoiceAction("VISA", invoiceId!, payload);
-          if (!applyActionResult(result, form, message)) return;
+          if (!applyActionResult(result, form, message)) {
+            printed.cancel();
+            return;
+          }
           const id =
             mode === "create" && result.ok ? (result.data as { id: string }).id : invoiceId!;
           message.success(post ? "Invoice saved and posted" : "Invoice saved as draft");
+          printed.show(id);
           router.push(`/invoices/visa/${id}`);
           router.refresh();
         });
       })
-      .catch(() => message.error("Please fix the highlighted fields"));
+      .catch(() => {
+        printed.cancel();
+        message.error("Please fix the highlighted fields");
+      });
   }
 
   const countryOptions = countries.map((c) => ({ value: c.label }));
@@ -166,6 +191,10 @@ export function VisaInvoiceForm({
         layout="vertical"
         requiredMark="optional"
         scrollToFirstError
+        onValuesChange={(changed: Partial<FormValues>) => {
+          const method = methodForAccount(accounts, changed.payment?.moneyAccountId);
+          if (method) form.setFieldValue(["payment", "paymentMethod"], method);
+        }}
         initialValues={
           initial
             ? {
@@ -177,150 +206,181 @@ export function VisaInvoiceForm({
                   expectedDate: l.expectedDate ? dayjs(l.expectedDate) : null,
                 })),
               }
-            : { date: dayjs(today), lines: [{}] }
+            : {
+                date: dayjs(today),
+                lines: [{}],
+                showDiscount: true,
+                payment: { date: dayjs(today) },
+              }
         }
       >
-        <InvoiceHeaderCard formName="visaInvoice" invoiceType="VISA" employees={employees} />
+        <div className="inv-layout">
+          <div className="inv-main">
+            <InvoiceHeaderCard formName="visaInvoice" invoiceType="VISA" employees={employees} />
 
-        <Card title="Passengers" style={{ marginBottom: 16 }}>
-          <Form.List name="lines">
-            {(fields, { add, remove }) => (
-              <>
-                {fields.map((field, index) => {
-                  const line = values?.lines?.[index];
-                  let profit: ReturnType<typeof d> | null = null;
-                  try {
-                    profit = d(line?.clientPrice).minus(d(line?.purchasePrice));
-                  } catch {
-                    profit = null;
-                  }
-                  return (
-                    <div
-                      key={field.key}
-                      style={{
-                        borderBottom: "1px solid #f0f0f0",
-                        paddingBottom: 8,
-                        marginBottom: 12,
-                      }}
-                    >
-                      <Form.Item name={[field.name, "id"]} hidden>
-                        <Input />
-                      </Form.Item>
-                      <Row gutter={10} align="bottom" className="line-row">
-                        <Col xs={24} md={8} xl={5}>
-                          <Form.Item
-                            label="Passenger name"
-                            name={[field.name, "passengerName"]}
-                            rules={[{ required: true, message: "Required" }]}
-                          >
-                            <Input maxLength={120} style={{ textTransform: "uppercase" }} />
+            <Card title="Passengers" style={{ marginBottom: 16 }}>
+              <Form.List name="lines">
+                {(fields, { add, remove }) => (
+                  <>
+                    {fields.map((field, index) => {
+                      const line = values?.lines?.[index];
+                      let profit: ReturnType<typeof d> | null = null;
+                      try {
+                        profit = d(line?.clientPrice).minus(d(line?.purchasePrice));
+                      } catch {
+                        profit = null;
+                      }
+                      return (
+                        <div
+                          key={field.key}
+                          style={{
+                            borderBottom: "1px solid #f0f0f0",
+                            paddingBottom: 8,
+                            marginBottom: 12,
+                          }}
+                        >
+                          <Form.Item name={[field.name, "id"]} hidden>
+                            <Input />
                           </Form.Item>
-                        </Col>
-                        <Col xs={12} md={4} xl={3}>
-                          <Form.Item label="Passport no." name={[field.name, "passportNo"]}>
-                            <Input maxLength={20} style={{ textTransform: "uppercase" }} />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={12} md={6} xl={3}>
-                          <Form.Item
-                            label="Country"
-                            name={[field.name, "country"]}
-                            rules={[{ required: true, message: "Required" }]}
-                          >
-                            <AutoComplete
-                              options={countryOptions}
-                              filterOption={(input, o) =>
-                                String(o?.value).toLowerCase().includes(input.toLowerCase())
-                              }
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={12} md={6} xl={3}>
-                          <Form.Item label="Visa type" name={[field.name, "visaTypeId"]}>
-                            <Select allowClear options={visaTypes} />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} md={8} xl={4}>
-                          <Form.Item
-                            label="Vendor"
-                            name={[field.name, "vendorId"]}
-                            rules={[{ required: true, message: "Choose the vendor" }]}
-                          >
-                            <PartySelect party="vendors" placeholder="Embassy agent / processor" />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={12} md={4} xl={2}>
-                          <Form.Item
-                            label="Client price"
-                            name={[field.name, "clientPrice"]}
-                            rules={[{ required: true, message: "Required" }]}
-                          >
-                            <MoneyInput />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={12} md={4} xl={2}>
-                          <Form.Item
-                            label="Cost"
-                            name={[field.name, "purchasePrice"]}
-                            rules={[{ required: true, message: "Required" }]}
-                          >
-                            <MoneyInput />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={12} md={4} xl={1}>
-                          <Form.Item label=" ">
-                            <Button
-                              danger
-                              icon={<DeleteOutlined />}
-                              aria-label={`Remove passenger ${index + 1}`}
-                              disabled={fields.length === 1}
-                              onClick={() => remove(field.name)}
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={12} md={6} xl={4}>
-                          <Form.Item label="Expected by" name={[field.name, "expectedDate"]}>
-                            <DatePicker format="DD MMM YYYY" style={{ width: "100%" }} />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12} xl={8}>
-                          <Form.Item label="Note" name={[field.name, "note"]}>
-                            <Input maxLength={300} />
-                          </Form.Item>
-                        </Col>
-                      </Row>
-                      <Space size="large" style={{ fontSize: 12 }}>
-                        <Typography.Text type={profit?.isNegative() ? "danger" : "success"}>
-                          Profit: {profit ? formatMoney(profit.toFixed(2)) : "-"}
-                        </Typography.Text>
-                        {line?.status && <Tag>{VISA_STATUS_LABEL[line.status] ?? line.status}</Tag>}
-                      </Space>
-                    </div>
-                  );
-                })}
-                <Button type="dashed" block icon={<PlusOutlined />} onClick={() => add({})}>
-                  Add passenger
-                </Button>
-              </>
+                          <Row gutter={10} align="bottom" className="line-row">
+                            <Col xs={24} md={8} xxl={5}>
+                              <Form.Item
+                                label="Passenger name"
+                                name={[field.name, "passengerName"]}
+                                rules={[{ required: true, message: "Required" }]}
+                              >
+                                <Input maxLength={120} style={{ textTransform: "uppercase" }} />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={4} xxl={3}>
+                              <Form.Item label="Passport no." name={[field.name, "passportNo"]}>
+                                <Input maxLength={20} style={{ textTransform: "uppercase" }} />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={6} xxl={3}>
+                              <Form.Item
+                                label="Country"
+                                name={[field.name, "country"]}
+                                rules={[{ required: true, message: "Required" }]}
+                              >
+                                <AutoComplete
+                                  options={countryOptions}
+                                  filterOption={(input, o) =>
+                                    String(o?.value).toLowerCase().includes(input.toLowerCase())
+                                  }
+                                />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={6} xxl={3}>
+                              <Form.Item label="Visa type" name={[field.name, "visaTypeId"]}>
+                                <Select allowClear options={visaTypes} />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} md={8} xxl={4}>
+                              <Form.Item
+                                label="Vendor"
+                                name={[field.name, "vendorId"]}
+                                rules={[{ required: true, message: "Choose the vendor" }]}
+                              >
+                                <PartySelect
+                                  party="vendors"
+                                  placeholder="Embassy agent / processor"
+                                />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={4} xxl={2}>
+                              <Form.Item
+                                label="Client price"
+                                name={[field.name, "clientPrice"]}
+                                rules={[{ required: true, message: "Required" }]}
+                              >
+                                <MoneyInput />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={4} xxl={2}>
+                              <Form.Item
+                                label="Cost"
+                                name={[field.name, "purchasePrice"]}
+                                rules={[{ required: true, message: "Required" }]}
+                              >
+                                <MoneyInput />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={4} xxl={1}>
+                              <Form.Item label=" ">
+                                <Button
+                                  danger
+                                  icon={<DeleteOutlined />}
+                                  aria-label={`Remove passenger ${index + 1}`}
+                                  disabled={fields.length === 1}
+                                  onClick={() => remove(field.name)}
+                                />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={6} xxl={4}>
+                              <Form.Item label="Expected by" name={[field.name, "expectedDate"]}>
+                                <DatePicker format="DD MMM YYYY" style={{ width: "100%" }} />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12} xxl={8}>
+                              <Form.Item label="Note" name={[field.name, "note"]}>
+                                <Input maxLength={300} />
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                          <Space size="large" style={{ fontSize: 12 }}>
+                            <Typography.Text type={profit?.isNegative() ? "danger" : "success"}>
+                              Profit: {profit ? formatMoney(profit.toFixed(2)) : "-"}
+                            </Typography.Text>
+                            {line?.status && (
+                              <Tag>{VISA_STATUS_LABEL[line.status] ?? line.status}</Tag>
+                            )}
+                          </Space>
+                        </div>
+                      );
+                    })}
+                    <Button type="dashed" block icon={<PlusOutlined />} onClick={() => add({})}>
+                      Add passenger
+                    </Button>
+                  </>
+                )}
+              </Form.List>
+            </Card>
+
+            {canReceive && (
+              <ReceivePaymentCard accounts={accounts} on={receive} onChange={setReceive} />
             )}
-          </Form.List>
-        </Card>
+          </div>
+          <InvoiceSummaryAside
+            rows={(values?.lines ?? []).map((l, i) => {
+              let profit: ReturnType<typeof d> | null = null;
+              try {
+                profit = d(l?.clientPrice).minus(d(l?.purchasePrice));
+              } catch {
+                profit = null;
+              }
+              return {
+                key: i,
+                label: l?.passengerName || `Passenger ${i + 1}`,
+                sub: [l?.country, l?.passportNo].filter(Boolean).join(" · ") || null,
+                sales: l?.clientPrice ? formatMoney(d(l.clientPrice).toFixed(2)) : null,
+                profit,
+              };
+            })}
+            rowsTitle="Passenger"
+            totals={totals}
+            received={receive ? d(values?.payment?.amount) : null}
+          />
+        </div>
 
-        <InvoiceTotalsCard totals={totals} />
-
-        <Flex gap={8} justify="flex-end" style={{ marginBottom: 24 }}>
-          <Link href={invoiceId ? `/invoices/visa/${invoiceId}` : "/invoices/visa"}>
-            <Button>Cancel</Button>
-          </Link>
-          {(mode === "create" || isDraft) && (
-            <Button loading={pending} onClick={() => submit(false)}>
-              Save as draft
-            </Button>
-          )}
-          <Button type="primary" loading={pending} onClick={() => submit(true)}>
-            {mode === "edit" && !isDraft ? "Save changes" : "Save & post"}
-          </Button>
-        </Flex>
+        <InvoiceActionBar
+          summary={`${(values?.lines ?? []).length} passenger${(values?.lines ?? []).length === 1 ? "" : "s"}`}
+          cancelHref={invoiceId ? `/invoices/visa/${invoiceId}` : "/invoices/visa"}
+          showDraft={mode === "create" || isDraft === true}
+          pending={pending}
+          primaryLabel={mode === "edit" && !isDraft ? "Save changes" : "Save & post"}
+          onSubmit={submit}
+        />
       </Form>
     </>
   );

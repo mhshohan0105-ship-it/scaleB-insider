@@ -26,7 +26,7 @@ export function InvoiceHeaderCard({
     <Card title="Invoice" style={{ marginBottom: 16 }}>
       <ClientField formName={formName} invoiceType={invoiceType} allowNew={allowNewClient} />
       <Row gutter={16}>
-        <Col xs={12} md={6} xl={4}>
+        <Col xs={12} md={6} xxl={4}>
           <Form.Item
             label="Invoice date"
             name="date"
@@ -35,12 +35,12 @@ export function InvoiceHeaderCard({
             <DatePicker format="DD MMM YYYY" style={{ width: "100%" }} allowClear={false} />
           </Form.Item>
         </Col>
-        <Col xs={12} md={6} xl={4}>
+        <Col xs={12} md={6} xxl={4}>
           <Form.Item label="Due date" name="dueDate">
             <DatePicker format="DD MMM YYYY" style={{ width: "100%" }} />
           </Form.Item>
         </Col>
-        <Col xs={24} md={12} xl={8}>
+        <Col xs={24} md={12} xxl={8}>
           <Form.Item label="Sold by" name="salesmanId">
             <Select
               allowClear
@@ -51,12 +51,12 @@ export function InvoiceHeaderCard({
             />
           </Form.Item>
         </Col>
-        <Col xs={24} md={12} xl={8}>
+        <Col xs={24} md={12} xxl={8}>
           <Form.Item label="Referred by agent" name="agentId">
             <PartySelect party="agents" id={`${formName}_agentId`} placeholder="Optional" />
           </Form.Item>
         </Col>
-        <Col xs={12} md={6} xl={4}>
+        <Col xs={12} md={6} xxl={4}>
           <Form.Item label="Agent commission" name="agentCommission">
             <MoneyInput placeholder="0.00" />
           </Form.Item>

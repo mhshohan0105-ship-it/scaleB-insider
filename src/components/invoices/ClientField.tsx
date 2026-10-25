@@ -152,8 +152,8 @@ export function ClientField({
             </Col>
           </Row>
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: -4 }}>
-            The client is saved together with this invoice. If the mobile number already belongs
-            to a client, you are told which one, so you can pick them instead.
+            The client is saved together with this invoice. If the mobile number already belongs to
+            a client, you are told which one, so you can pick them instead.
           </Typography.Paragraph>
         </div>
       )}

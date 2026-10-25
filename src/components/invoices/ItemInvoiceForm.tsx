@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useTransition } from "react";
-import Link from "next/link";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   App,
@@ -9,7 +8,6 @@ import {
   Card,
   Col,
   DatePicker,
-  Flex,
   Form,
   Input,
   Row,
@@ -20,6 +18,7 @@ import {
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import { calcInvoiceTotals } from "@/lib/calc/invoiceTotals";
+import { d } from "@/lib/calc/money";
 import { calcItemLine } from "@/lib/calc/items";
 import { formatMoney } from "@/lib/format";
 import { INVOICE_TYPE_INFO } from "@/lib/invoiceTypes";
@@ -32,7 +31,16 @@ import { PartySelect } from "@/components/PartySelect";
 import { applyActionResult } from "@/components/formResult";
 import { createInvoiceAction, updateInvoiceAction } from "@/app/(app)/invoices/invoiceActions";
 import { InvoiceHeaderCard } from "./InvoiceHeaderCard";
-import { InvoiceTotalsCard } from "./InvoiceTotalsCard";
+import {
+  InvoiceActionBar,
+  InvoiceSummaryAside,
+  ReceivePaymentCard,
+  methodForAccount,
+  openPrintWindow,
+  paymentPayload,
+  type AccountOption,
+  type PaymentFormValues,
+} from "./InvoiceFormParts";
 
 export type ItemFormType = "OTHER" | "OTHER_PACKAGE" | "TOUR" | "UMRAH" | "HAJJ_PRE_REG" | "HAJJ";
 
@@ -67,6 +75,10 @@ interface FormValues {
   groupId?: string | null;
   travelDate?: Dayjs | null;
   returnDate?: Dayjs | null;
+  reference?: string | null;
+  showPrevDue?: boolean;
+  showDiscount?: boolean;
+  payment?: PaymentFormValues;
   items?: ItemRow[];
 }
 
@@ -100,6 +112,8 @@ interface Props {
   initial?: ItemFormInitial;
   today: string;
   options: ItemFormOptions;
+  /** Accounts money can go into; empty when the user may not take payments. */
+  accounts?: AccountOption[];
 }
 
 const KIND_OPTIONS = [
@@ -155,12 +169,15 @@ export function ItemInvoiceForm({
   initial,
   today,
   options,
+  accounts = [],
 }: Props) {
   const router = useRouter();
   const { message } = App.useApp();
   const [form] = Form.useForm<FormValues>();
   const [pending, startTransition] = useTransition();
   const values = Form.useWatch([], form) as FormValues | undefined;
+  const [receive, setReceive] = useState(false);
+  const canReceive = mode === "create" && accounts.length > 0;
   const basePath = INVOICE_TYPE_INFO[type].path;
   const hajj = type === "HAJJ_PRE_REG" || type === "HAJJ";
   // Hajj lines are one per pilgrim like Umrah, but pick a pilgrim record.
@@ -218,7 +235,8 @@ export function ItemInvoiceForm({
     ]);
   }
 
-  function submit(post: boolean) {
+  function submit(post: boolean, print = false) {
+    const printed = openPrintWindow(print);
     form
       .validateFields()
       .then((v) => {
@@ -229,6 +247,7 @@ export function ItemInvoiceForm({
           travelDate: iso(v.travelDate),
           returnDate: iso(v.returnDate),
           items: (v.items ?? []).map((it) => ({ ...it, qty: umrah ? "1" : it.qty })),
+          payment: paymentPayload(v.payment, canReceive && receive && post, iso),
           post,
         };
         startTransition(async () => {
@@ -236,15 +255,22 @@ export function ItemInvoiceForm({
             mode === "create"
               ? await createInvoiceAction(type, payload)
               : await updateInvoiceAction(type, invoiceId!, payload);
-          if (!applyActionResult(result, form, message)) return;
+          if (!applyActionResult(result, form, message)) {
+            printed.cancel();
+            return;
+          }
           const id =
             mode === "create" && result.ok ? (result.data as { id: string }).id : invoiceId!;
           message.success(post ? "Invoice saved and posted" : "Invoice saved as draft");
+          printed.show(id);
           router.push(`${basePath}/${id}`);
           router.refresh();
         });
       })
-      .catch(() => message.error("Please fix the highlighted fields"));
+      .catch(() => {
+        printed.cancel();
+        message.error("Please fix the highlighted fields");
+      });
   }
 
   const money = (v: { toFixed(n: number): string } | null | undefined) =>
@@ -263,7 +289,7 @@ export function ItemInvoiceForm({
   const headerExtra = (
     <>
       {tour && (
-        <Col xs={24} md={12} xl={8}>
+        <Col xs={24} md={12} xxl={8}>
           <Form.Item label="Tour group" name="tourGroupId">
             <Select
               allowClear
@@ -276,7 +302,7 @@ export function ItemInvoiceForm({
         </Col>
       )}
       {umrah && (
-        <Col xs={24} md={12} xl={8}>
+        <Col xs={24} md={12} xxl={8}>
           <Form.Item label="Group" name="groupId">
             <Select
               allowClear
@@ -290,12 +316,12 @@ export function ItemInvoiceForm({
       )}
       {(tour || umrah) && (
         <>
-          <Col xs={12} md={6} xl={4}>
+          <Col xs={12} md={6} xxl={4}>
             <Form.Item label="Travel date" name="travelDate">
               <DatePicker format="DD MMM YYYY" style={{ width: "100%" }} />
             </Form.Item>
           </Col>
-          <Col xs={12} md={6} xl={4}>
+          <Col xs={12} md={6} xxl={4}>
             <Form.Item label="Return date" name="returnDate">
               <DatePicker format="DD MMM YYYY" style={{ width: "100%" }} />
             </Form.Item>
@@ -330,226 +356,259 @@ export function ItemInvoiceForm({
                 travelDate: initial.travelDate ? dayjs(initial.travelDate) : null,
                 returnDate: initial.returnDate ? dayjs(initial.returnDate) : null,
               }
-            : { date: dayjs(today), items: [newLine(type)] }
+            : {
+                date: dayjs(today),
+                items: [newLine(type)],
+                showDiscount: true,
+                payment: { date: dayjs(today) },
+              }
         }
+        onValuesChange={(changed: Partial<FormValues>) => {
+          const method = methodForAccount(accounts, changed.payment?.moneyAccountId);
+          if (method) form.setFieldValue(["payment", "paymentMethod"], method);
+        }}
       >
-        <InvoiceHeaderCard
-          formName="itemInvoice"
-          invoiceType={type}
-          employees={options.employees}
-          extra={headerExtra}
-        />
+        <div className="inv-layout">
+          <div className="inv-main">
+            <InvoiceHeaderCard
+              formName="itemInvoice"
+              invoiceType={type}
+              employees={options.employees}
+              extra={headerExtra}
+            />
 
-        <Card
-          title={umrah ? "Pilgrims" : "Lines"}
-          style={{ marginBottom: 16 }}
-          extra={
-            tour &&
-            itineraryGroups.length > 0 && (
-              <Select
-                showSearch
-                optionFilterProp="label"
-                placeholder="Add a cost from the itinerary"
-                style={{ width: 320 }}
-                value={null}
-                options={itineraryGroups}
-                onChange={(id) => id && addFromItinerary(id)}
-                aria-label="Add from itinerary"
-              />
-            )
-          }
-        >
-          <Form.List name="items">
-            {(fields, { add, remove }) => (
-              <>
-                {fields.map((field, index) => {
-                  const l = lines[index];
-                  return (
-                    <div
-                      key={field.key}
-                      style={{
-                        borderBottom: "1px solid #f0f0f0",
-                        paddingBottom: 8,
-                        marginBottom: 12,
-                      }}
-                    >
-                      <Row gutter={10} align="bottom" className="line-row">
-                        {hajj ? (
-                          <>
-                            <Col xs={24} md={12} xl={type === "HAJJ" ? 6 : 8}>
+            <Card
+              title={umrah ? "Pilgrims" : "Lines"}
+              style={{ marginBottom: 16 }}
+              extra={
+                tour &&
+                itineraryGroups.length > 0 && (
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Add a cost from the itinerary"
+                    style={{ width: 320 }}
+                    value={null}
+                    options={itineraryGroups}
+                    onChange={(id) => id && addFromItinerary(id)}
+                    aria-label="Add from itinerary"
+                  />
+                )
+              }
+            >
+              <Form.List name="items">
+                {(fields, { add, remove }) => (
+                  <>
+                    {fields.map((field, index) => {
+                      const l = lines[index];
+                      return (
+                        <div
+                          key={field.key}
+                          style={{
+                            borderBottom: "1px solid #f0f0f0",
+                            paddingBottom: 8,
+                            marginBottom: 12,
+                          }}
+                        >
+                          <Row gutter={10} align="bottom" className="line-row">
+                            {hajj ? (
+                              <>
+                                <Col xs={24} md={12} xxl={type === "HAJJ" ? 6 : 8}>
+                                  <Form.Item
+                                    label="Pilgrim"
+                                    name={[field.name, "pilgrimId"]}
+                                    rules={[{ required: true, message: "Choose the pilgrim" }]}
+                                  >
+                                    <Select
+                                      showSearch
+                                      optionFilterProp="label"
+                                      options={options.pilgrims}
+                                      placeholder="Name, passport or tracking no."
+                                      notFoundContent="No active pilgrims. Add them under Hajj Registration."
+                                    />
+                                  </Form.Item>
+                                </Col>
+                                {type === "HAJJ" && (
+                                  <Col xs={12} md={4} xxl={2}>
+                                    <Form.Item label="Room" name={[field.name, "roomTypeId"]}>
+                                      <Select allowClear options={options.roomTypes} />
+                                    </Form.Item>
+                                  </Col>
+                                )}
+                              </>
+                            ) : umrah ? (
+                              <>
+                                <Col xs={24} md={8} xxl={5}>
+                                  <Form.Item
+                                    label="Pilgrim name"
+                                    name={[field.name, "passengerName"]}
+                                    rules={[{ required: true, message: "Required" }]}
+                                  >
+                                    <Input maxLength={120} style={{ textTransform: "uppercase" }} />
+                                  </Form.Item>
+                                </Col>
+                                <Col xs={12} md={4} xxl={3}>
+                                  <Form.Item label="Passport no." name={[field.name, "passportNo"]}>
+                                    <Input maxLength={20} style={{ textTransform: "uppercase" }} />
+                                  </Form.Item>
+                                </Col>
+                                <Col xs={12} md={4} xxl={3}>
+                                  <Form.Item label="Room" name={[field.name, "roomTypeId"]}>
+                                    <Select allowClear options={options.roomTypes} />
+                                  </Form.Item>
+                                </Col>
+                              </>
+                            ) : (
+                              <>
+                                {tour ? (
+                                  <Col xs={12} md={6} xxl={3}>
+                                    <Form.Item label="Kind" name={[field.name, "kind"]}>
+                                      <Select options={KIND_OPTIONS} />
+                                    </Form.Item>
+                                  </Col>
+                                ) : (
+                                  <Col xs={12} md={6} xxl={4}>
+                                    <Form.Item label="Product" name={[field.name, "productId"]}>
+                                      <Select
+                                        allowClear
+                                        showSearch
+                                        optionFilterProp="label"
+                                        options={options.products}
+                                        onChange={(_, opt) => {
+                                          const label = (opt as FieldOption | undefined)?.label;
+                                          if (
+                                            label &&
+                                            !form.getFieldValue([
+                                              "items",
+                                              field.name,
+                                              "description",
+                                            ])
+                                          ) {
+                                            form.setFieldValue(
+                                              ["items", field.name, "description"],
+                                              label,
+                                            );
+                                          }
+                                        }}
+                                      />
+                                    </Form.Item>
+                                  </Col>
+                                )}
+                                <Col xs={12} md={4} xxl={2}>
+                                  <Form.Item
+                                    label="Qty"
+                                    name={[field.name, "qty"]}
+                                    rules={[{ required: true, message: "Required" }]}
+                                  >
+                                    <MoneyInput precision={2} />
+                                  </Form.Item>
+                                </Col>
+                              </>
+                            )}
+                            <Col xs={24} md={umrah ? 8 : 10} xxl={umrah ? 5 : 6}>
                               <Form.Item
-                                label="Pilgrim"
-                                name={[field.name, "pilgrimId"]}
-                                rules={[{ required: true, message: "Choose the pilgrim" }]}
+                                label={
+                                  type === "HAJJ_PRE_REG"
+                                    ? "Fee"
+                                    : umrah
+                                      ? "Package"
+                                      : "Description"
+                                }
+                                name={[field.name, "description"]}
+                                rules={[{ required: true, message: "Required" }]}
                               >
-                                <Select
-                                  showSearch
-                                  optionFilterProp="label"
-                                  options={options.pilgrims}
-                                  placeholder="Name, passport or tracking no."
-                                  notFoundContent="No active pilgrims. Add them under Hajj Registration."
+                                <Input maxLength={300} />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={4} xxl={2}>
+                              <Form.Item
+                                label={umrah ? "Price" : "Unit price"}
+                                name={[field.name, "unitPrice"]}
+                              >
+                                <MoneyInput placeholder="0.00" />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={12} md={4} xxl={2}>
+                              <Form.Item
+                                label={umrah ? "Cost" : "Unit cost"}
+                                name={[field.name, "unitCost"]}
+                              >
+                                <MoneyInput placeholder="0.00" />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={20} md={8} xxl={umrah ? 3 : 4}>
+                              <Form.Item label="Vendor" name={[field.name, "vendorId"]}>
+                                <PartySelect party="vendors" placeholder="Who you pay" />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={4} md={2} xxl={1}>
+                              <Form.Item label=" ">
+                                <Button
+                                  danger
+                                  icon={<DeleteOutlined />}
+                                  aria-label={`Remove line ${index + 1}`}
+                                  disabled={fields.length === 1}
+                                  onClick={() => remove(field.name)}
                                 />
                               </Form.Item>
                             </Col>
-                            {type === "HAJJ" && (
-                              <Col xs={12} md={4} xl={2}>
-                                <Form.Item label="Room" name={[field.name, "roomTypeId"]}>
-                                  <Select allowClear options={options.roomTypes} />
-                                </Form.Item>
-                              </Col>
-                            )}
-                          </>
-                        ) : umrah ? (
-                          <>
-                            <Col xs={24} md={8} xl={5}>
-                              <Form.Item
-                                label="Pilgrim name"
-                                name={[field.name, "passengerName"]}
-                                rules={[{ required: true, message: "Required" }]}
-                              >
-                                <Input maxLength={120} style={{ textTransform: "uppercase" }} />
-                              </Form.Item>
-                            </Col>
-                            <Col xs={12} md={4} xl={3}>
-                              <Form.Item label="Passport no." name={[field.name, "passportNo"]}>
-                                <Input maxLength={20} style={{ textTransform: "uppercase" }} />
-                              </Form.Item>
-                            </Col>
-                            <Col xs={12} md={4} xl={3}>
-                              <Form.Item label="Room" name={[field.name, "roomTypeId"]}>
-                                <Select allowClear options={options.roomTypes} />
-                              </Form.Item>
-                            </Col>
-                          </>
-                        ) : (
-                          <>
-                            {tour ? (
-                              <Col xs={12} md={6} xl={3}>
-                                <Form.Item label="Kind" name={[field.name, "kind"]}>
-                                  <Select options={KIND_OPTIONS} />
-                                </Form.Item>
-                              </Col>
-                            ) : (
-                              <Col xs={12} md={6} xl={4}>
-                                <Form.Item label="Product" name={[field.name, "productId"]}>
-                                  <Select
-                                    allowClear
-                                    showSearch
-                                    optionFilterProp="label"
-                                    options={options.products}
-                                    onChange={(_, opt) => {
-                                      const label = (opt as FieldOption | undefined)?.label;
-                                      if (
-                                        label &&
-                                        !form.getFieldValue(["items", field.name, "description"])
-                                      ) {
-                                        form.setFieldValue(
-                                          ["items", field.name, "description"],
-                                          label,
-                                        );
-                                      }
-                                    }}
-                                  />
-                                </Form.Item>
-                              </Col>
-                            )}
-                            <Col xs={12} md={4} xl={2}>
-                              <Form.Item
-                                label="Qty"
-                                name={[field.name, "qty"]}
-                                rules={[{ required: true, message: "Required" }]}
-                              >
-                                <MoneyInput precision={2} />
-                              </Form.Item>
-                            </Col>
-                          </>
-                        )}
-                        <Col xs={24} md={umrah ? 8 : 10} xl={umrah ? 5 : 6}>
-                          <Form.Item
-                            label={
-                              type === "HAJJ_PRE_REG" ? "Fee" : umrah ? "Package" : "Description"
-                            }
-                            name={[field.name, "description"]}
-                            rules={[{ required: true, message: "Required" }]}
-                          >
-                            <Input maxLength={300} />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={12} md={4} xl={2}>
-                          <Form.Item
-                            label={umrah ? "Price" : "Unit price"}
-                            name={[field.name, "unitPrice"]}
-                          >
-                            <MoneyInput placeholder="0.00" />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={12} md={4} xl={2}>
-                          <Form.Item
-                            label={umrah ? "Cost" : "Unit cost"}
-                            name={[field.name, "unitCost"]}
-                          >
-                            <MoneyInput placeholder="0.00" />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={20} md={8} xl={umrah ? 3 : 4}>
-                          <Form.Item label="Vendor" name={[field.name, "vendorId"]}>
-                            <PartySelect party="vendors" placeholder="Who you pay" />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={4} md={2} xl={1}>
-                          <Form.Item label=" ">
-                            <Button
-                              danger
-                              icon={<DeleteOutlined />}
-                              aria-label={`Remove line ${index + 1}`}
-                              disabled={fields.length === 1}
-                              onClick={() => remove(field.name)}
-                            />
-                          </Form.Item>
-                        </Col>
-                      </Row>
-                      <Space size="large" style={{ fontSize: 12 }}>
-                        <Typography.Text type="secondary">
-                          Client: {money(l?.clientPrice)}
-                        </Typography.Text>
-                        <Typography.Text type="secondary">
-                          Cost: {money(l?.purchasePrice)}
-                        </Typography.Text>
-                        <Typography.Text type={l?.profit.isNegative() ? "danger" : "success"}>
-                          Profit: {money(l?.profit)}
-                        </Typography.Text>
-                      </Space>
-                    </div>
-                  );
-                })}
-                <Button
-                  type="dashed"
-                  block
-                  icon={<PlusOutlined />}
-                  onClick={() => add(newLine(type))}
-                >
-                  {umrah ? "Add pilgrim" : "Add line"}
-                </Button>
-              </>
+                          </Row>
+                          <Space size="large" style={{ fontSize: 12 }}>
+                            <Typography.Text type="secondary">
+                              Client: {money(l?.clientPrice)}
+                            </Typography.Text>
+                            <Typography.Text type="secondary">
+                              Cost: {money(l?.purchasePrice)}
+                            </Typography.Text>
+                            <Typography.Text type={l?.profit.isNegative() ? "danger" : "success"}>
+                              Profit: {money(l?.profit)}
+                            </Typography.Text>
+                          </Space>
+                        </div>
+                      );
+                    })}
+                    <Button
+                      type="dashed"
+                      block
+                      icon={<PlusOutlined />}
+                      onClick={() => add(newLine(type))}
+                    >
+                      {umrah ? "Add pilgrim" : "Add line"}
+                    </Button>
+                  </>
+                )}
+              </Form.List>
+            </Card>
+
+            {canReceive && (
+              <ReceivePaymentCard accounts={accounts} on={receive} onChange={setReceive} />
             )}
-          </Form.List>
-        </Card>
+          </div>
+          <InvoiceSummaryAside
+            rows={(values?.items ?? []).map((it, i) => {
+              const l = lines[i];
+              return {
+                key: i,
+                label: it?.passengerName || it?.description || `Line ${i + 1}`,
+                sub: it?.passengerName ? (it?.description ?? null) : null,
+                sales: l ? formatMoney(l.clientPrice.toFixed(2)) : null,
+                profit: l ? l.clientPrice.minus(l.purchasePrice) : null,
+              };
+            })}
+            rowsTitle={umrah ? "Pilgrim" : "Line"}
+            totals={totals}
+            received={receive ? d(values?.payment?.amount) : null}
+          />
+        </div>
 
-        <InvoiceTotalsCard totals={totals} />
-
-        <Flex gap={8} justify="flex-end" style={{ marginBottom: 24 }}>
-          <Link href={invoiceId ? `${basePath}/${invoiceId}` : basePath}>
-            <Button>Cancel</Button>
-          </Link>
-          {(mode === "create" || isDraft) && (
-            <Button loading={pending} onClick={() => submit(false)}>
-              Save as draft
-            </Button>
-          )}
-          <Button type="primary" loading={pending} onClick={() => submit(true)}>
-            {mode === "edit" && !isDraft ? "Save changes" : "Save & post"}
-          </Button>
-        </Flex>
+        <InvoiceActionBar
+          summary={`${(values?.items ?? []).length} ${umrah ? "pilgrim" : "line"}${(values?.items ?? []).length === 1 ? "" : "s"}`}
+          cancelHref={invoiceId ? `${basePath}/${invoiceId}` : basePath}
+          showDraft={mode === "create" || isDraft === true}
+          pending={pending}
+          primaryLabel={mode === "edit" && !isDraft ? "Save changes" : "Save & post"}
+          onSubmit={submit}
+        />
       </Form>
     </>
   );

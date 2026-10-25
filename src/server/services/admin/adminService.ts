@@ -25,7 +25,7 @@ export interface AdminActor {
   name: string;
 }
 
-async function assertSuperAdmin(userId: string) {
+export async function assertSuperAdmin(userId: string) {
   const u = await prisma.user.findUnique({
     where: { id: userId },
     select: { isSuperAdmin: true, isActive: true },

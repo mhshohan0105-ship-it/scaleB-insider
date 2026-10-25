@@ -14,6 +14,11 @@ import {
   startImpersonation,
   type AdminActor,
 } from "@/server/services/admin/adminService";
+import {
+  backupNow,
+  disconnectGoogle,
+  saveGoogleClient,
+} from "@/server/services/backup/platformBackup";
 import { replyFeedback, sendFeedback } from "@/server/services/feedback/feedbackService";
 import { sendManualSms, sendPassportReminders } from "@/server/services/sms/smsService";
 
@@ -65,4 +70,16 @@ export async function openAgencyAction(id: string) {
     const token = await startImpersonation(await actor(), id);
     await signIn("impersonate", { token, redirectTo: "/dashboard" });
   });
+}
+
+export async function backupNowAction() {
+  return runAction(async () => backupNow(await actor()));
+}
+
+export async function saveGoogleClientAction(values: unknown) {
+  return runAction(async () => saveGoogleClient(await actor(), values));
+}
+
+export async function disconnectGoogleAction() {
+  return runAction(async () => disconnectGoogle(await actor()));
 }

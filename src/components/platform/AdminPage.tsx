@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { App, Button, Card, Divider, Form, Input, Modal, Select, Space, Table, Tag } from "antd";
 import type { TableColumnsType } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import { CloudServerOutlined, PlusOutlined } from "@ant-design/icons";
 import { formatDate, formatDateTime } from "@/lib/format";
 import type { AgencyRow } from "@/server/services/admin/adminService";
 import { PageHeader } from "@/components/PageHeader";
@@ -156,9 +156,14 @@ export function AdminPage({ agencies, plans }: Props) {
         title="Platform admin"
         description="Every agency on this installation. Only platform administrators see this page."
         extra={
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreating(true)}>
-            New agency
-          </Button>
+          <>
+            <Button icon={<CloudServerOutlined />} href="/admin/backups">
+              Database backups
+            </Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreating(true)}>
+              New agency
+            </Button>
+          </>
         }
       />
       <Card>

@@ -265,3 +265,16 @@ Decision (owner, 2026-10-21): run on the existing Intelwebhost cPanel hosting, w
 Verified on MariaDB 10.11.19 (the host's version): `npm run check` green (207 unit + 118 integration); Playwright 28/28 twice; the ledger integrity check is clean on the dev and e2e databases (debits equal credits, no cached balance drift).
 
 Known: report PDFs take about 3.4 seconds for 400 rows (react-pdf layout); Excel exports are fast. Hyphenation, the page total and repeated headers were measured and are not the cause.
+
+## Nightly encrypted backups to the server and Google Drive (2026-10-25)
+
+Decision (owner, 2026-10-25): a full backup every night at 02:00 Dhaka time, kept on the server and on the owner's Google Drive.
+
+- `/api/cron/backup` (Bearer `CRON_SECRET`) takes a full SQL dump of the whole database (every agency), written in JS because the host has no shell (`src/server/backup/sqlDump.ts`). The file is gzip + AES-256-GCM (`SBK1` format); it goes to `~/backups/scaleb-insider` (outside `public_html`, `BACKUP_DIR` overrides) and to a Drive folder "scaleB Insider backups".
+- Retention (pure, unit tested, `src/lib/backup/retention.ts`): every copy from the last 30 days, the newest copy of each month for 12 months, the newest June copy (fiscal year end) forever, manual copies for 90 days, always the newest. Applied to the server folder and to Drive.
+- Google Drive through OAuth with the `drive.file` scope: the app sees only its own uploads. The owner creates the OAuth client; its ID and secret are entered on the page.
+- Admin > Database backups (platform administrators only): status, history, Back up now, Drive connect or disconnect, recovery key download, server copies download. Failed or incomplete runs notify the platform administrators.
+- `scripts/open-backup.ts` decrypts a backup into a `.sql` file for phpMyAdmin.
+- New platform tables `BackupRun` and `BackupConfig` (migration `20261025100018_backups`).
+
+Verified: `npm run check` green (217 unit + 122 integration). The integration test restores a dump into an empty database and every table's `CHECKSUM TABLE` matches; the file opens only with its key. A manual backup from the page works locally and the script decrypts it.

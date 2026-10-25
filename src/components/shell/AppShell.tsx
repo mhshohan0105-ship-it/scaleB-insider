@@ -16,6 +16,7 @@ import {
 } from "antd";
 import type { MenuProps } from "antd";
 import {
+  CloudServerOutlined,
   CrownOutlined,
   KeyOutlined,
   LogoutOutlined,
@@ -153,6 +154,11 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
             key: "admin",
             icon: <CrownOutlined />,
             label: <Link href="/admin">Platform admin</Link>,
+          },
+          {
+            key: "backups",
+            icon: <CloudServerOutlined />,
+            label: <Link href="/admin/backups">Database backups</Link>,
           },
         ]
       : []),

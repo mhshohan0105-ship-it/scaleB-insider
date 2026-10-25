@@ -2226,3 +2226,36 @@ model VoucherAllocation {
   @@unique([voucherId, invoiceId])
   @@index([agencyId, invoiceId])
 }
+
+/// Platform level (no agencyId): one row per nightly or manual full database
+/// backup. Only the platform backup service touches it.
+model BackupRun {
+  id          String    @id @default(cuid())
+  kind        String    @db.VarChar(16) // SCHEDULED | MANUAL
+  status      String    @db.VarChar(16) // RUNNING | OK | FAILED
+  fileName    String?   @db.VarChar(191)
+  sizeBytes   Int?
+  sha256      String?   @db.VarChar(64)
+  tables      Int?
+  rows        Int?
+  savedLocal  Boolean   @default(false)
+  driveFileId String?   @db.VarChar(191)
+  error       String?   @db.Text
+  startedAt   DateTime  @default(now())
+  finishedAt  DateTime?
+
+  @@index([startedAt])
+}
+
+/// Platform level singleton (id "default"): the backup encryption key and the
+/// Google Drive connection.
+model BackupConfig {
+  id                 String   @id
+  encryptionKey      String   @db.Text // base64, 32 bytes
+  googleClientId     String?  @db.Text
+  googleClientSecret String?  @db.Text
+  googleRefreshToken String?  @db.Text
+  googleEmail        String?  @db.Text
+  driveFolderId      String?  @db.Text
+  updatedAt          DateTime @updatedAt
+}

@@ -64,8 +64,22 @@ the built files are uploaded.
    even with the app stopped; Stop/Restart does not end them). End them with a one-off cron line
    `pkill -u USER -f next-server`, remove the line after a minute, then Start the app.
 6. **Scheduled jobs:** Cron Jobs, server clock is Dhaka time:
-   `30 1 * * *` ledger check and `0 9 * * *` daily, each
+   `30 1 * * *` ledger check, `0 2 * * *` backup and `0 9 * * *` daily, each
    `curl -fsS -H "Authorization: Bearer CRON_SECRET" https://insider.example.com/api/cron/<job> > /dev/null 2>&1`.
+
+7. **Backups to Google Drive (once):** in Google Cloud Console (console.cloud.google.com, signed in
+   with the Google account that should hold the backups):
+   1. Create a project, then APIs & Services > Library > **Google Drive API** > Enable.
+   2. OAuth consent screen: External, app name "scaleB Insider backups", your email; add the scope
+      `.../auth/drive.file`; then **Publish app** (in Testing mode Google drops the sign-in after
+      7 days).
+   3. Credentials > Create credentials > OAuth client ID > **Web application**, authorised redirect
+      URI `https://insider.example.com/api/admin/backups/google`.
+   4. In the app: user menu > Database backups, paste the Client ID and secret, Save, then
+      **Connect Google Drive** and allow access. Download the **recovery key** and keep it off the
+      server: without it no backup can be opened.
+   A backup opens with `npx tsx scripts/open-backup.ts <file> <key file>`; import the `.sql` in
+   phpMyAdmin (into an empty database).
 
 **Updates:** build again (step 4), upload and extract over the old files, apply any new migration
 SQL in phpMyAdmin first, then Restart. Backups: JetBackup in cPanel plus Configuration → Database

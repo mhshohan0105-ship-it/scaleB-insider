@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<title>scaleB Insider ব্যবহার নির্দেশিকা</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  :root { --brand: #0f6b5c; --brand-soft: #e7f3f0; --ink: #1d2725; --muted: #5b6b67; --line: #d6e2df; }
+  * { box-sizing: border-box; }
+  body { font-family: "Nirmala UI", "Noto Sans Bengali", "Segoe UI", sans-serif; color: var(--ink); font-size: 10.5pt; line-height: 1.65; margin: 0; background: #fff; }
+  h1, h2, h3 { color: var(--brand); line-height: 1.3; }
+  h2 { font-size: 16pt; border-bottom: 2px solid var(--brand); padding-bottom: 4px; margin: 0 0 10px; page-break-after: avoid; }
+  h3 { font-size: 12pt; margin: 16px 0 6px; page-break-after: avoid; }
+  p { margin: 4px 0 8px; }
+  ul, ol { margin: 4px 0 10px; padding-left: 22px; }
+  li { margin: 2px 0; }
+  code, .k { font-family: Consolas, "Nirmala UI", monospace; background: var(--brand-soft); padding: 0 4px; border-radius: 3px; font-size: 9.5pt; }
+  .menu { font-weight: 700; color: var(--brand); }
+  section { page-break-before: always; }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 12px; page-break-inside: avoid; }
+  th, td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; vertical-align: top; }
+  th { background: var(--brand-soft); color: var(--brand); }
+  .tip, .warn { border-left: 4px solid var(--brand); background: var(--brand-soft); padding: 8px 12px; margin: 10px 0; border-radius: 0 6px 6px 0; page-break-inside: avoid; }
+  .warn { border-left-color: #b4561c; background: #fbefe6; }
+  .tip b, .warn b { display: block; margin-bottom: 2px; }
+  .flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0 12px; }
+  .flow span { background: var(--brand); color: #fff; padding: 4px 10px; border-radius: 14px; font-size: 9.5pt; }
+  .flow i { color: var(--muted); font-style: normal; }
+  /* cover */
+  .cover { height: 255mm; display: flex; flex-direction: column; justify-content: center; padding: 0 10mm;
+           background: linear-gradient(160deg, #0d3f37 0%, #0f6b5c 60%, #13806e 100%); color: #fff; margin: -18mm -16mm 0; padding: 0 26mm; }
+  .cover .logo { width: 64px; height: 64px; border-radius: 14px; background: #eaf5f2; color: #0d3f37; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 22pt; margin-bottom: 26px; }
+  .cover h1 { color: #fff; font-size: 34pt; margin: 0 0 6px; }
+  .cover .sub { font-size: 15pt; opacity: .92; margin-bottom: 30px; }
+  .cover .meta { font-size: 10.5pt; opacity: .85; border-top: 1px solid rgba(255,255,255,.35); padding-top: 14px; }
+  .toc ol { columns: 2; column-gap: 28px; }
+  .toc li { break-inside: avoid; }
+  .small { font-size: 9pt; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="logo">sB</div>
+  <h1>scaleB Insider</h1>
+  <div class="sub">ব্যবহার নির্দেশিকা: ট্রাভেল এজেন্সির হিসাব ও ব্যবস্থাপনা</div>
+  <div class="meta">
+    ঠিকানা: <b>https://insider.scalebbd.com</b><br>
+    সংস্করণ: অক্টোবর ২০২৬ &nbsp;·&nbsp; মুদ্রা: BDT &nbsp;·&nbsp; সময়: বাংলাদেশ সময় (Asia/Dhaka)
+  </div>
+</div>
+
+<section class="toc">
+  <h2>সূচিপত্র</h2>
+  <ol>
+    <li>scaleB Insider কী</li>
+    <li>লগইন ও পাসওয়ার্ড</li>
+    <li>স্ক্রিন পরিচিতি</li>
+    <li>প্রথম দিনের সেটআপ (ধাপে ধাপে)</li>
+    <li>ক্লায়েন্ট, ভেন্ডর ও এজেন্ট</li>
+    <li>এয়ার টিকেট ইনভয়েস</li>
+    <li>অন্যান্য ইনভয়েস (ভিসা, ট্যুর, উমরাহ…)</li>
+    <li>হজ্জ ও হাজী ব্যবস্থাপনা</li>
+    <li>টাকা গ্রহণ: Money Receipt</li>
+    <li>ভেন্ডর ও এজেন্ট পেমেন্ট</li>
+    <li>রিইস্যু ও রিফান্ড</li>
+    <li>ভুল সংশোধন: Void</li>
+    <li>অ্যাকাউন্টস, চেক ও ব্যাংক</li>
+    <li>খরচ, বেতন, লোন ও বিনিয়োগ</li>
+    <li>কোটেশন ও পাসপোর্ট</li>
+    <li>রিপোর্ট</li>
+    <li>ইউজার, রোল ও অনুমতি</li>
+    <li>SMS ও ব্যাকআপ</li>
+    <li>দৈনিক কাজের চেকলিস্ট</li>
+    <li>সমস্যা ও সমাধান</li>
+  </ol>
+
+  <h3>মূল কাজের ধারা এক নজরে</h3>
+  <div class="flow"><span>ক্লায়েন্ট/ভেন্ডর যোগ</span><i>→</i><span>ইনভয়েস তৈরি</span><i>→</i><span>Money Receipt (টাকা গ্রহণ)</span><i>→</i><span>Vendor Payment</span><i>→</i><span>রিপোর্ট দেখা</span></div>
+  <p>প্রতিটি ইনভয়েস, রিসিপ্ট ও পেমেন্ট সাথে সাথে হিসাবের খাতায় (journal) নিজে থেকে পোস্ট হয়। আলাদা করে খাতা লিখতে হয় না। ক্লায়েন্টের পাওনা, ভেন্ডরের দেনা, ক্যাশ/ব্যাংক ব্যালেন্স আর লাভ-ক্ষতি সবসময় হালনাগাদ থাকে।</p>
+</section>
+
+<section>
+  <h2>১. scaleB Insider কী</h2>
+  <p>scaleB Insider একটি অনলাইন সফটওয়্যার। এতে ট্রাভেল এজেন্সির টিকেট, ভিসা, ট্যুর, হজ্জ ও উমরাহর বিক্রি, টাকা গ্রহণ, ভেন্ডর পেমেন্ট, খরচ, বেতন আর পুরো হিসাব (accounting) এক জায়গায় রাখা যায়। ব্রাউজার থেকে চলে, তাই কম্পিউটার বা মোবাইল যেকোনো জায়গা থেকে ব্যবহার করা যায়।</p>
+  <ul>
+    <li><b>ডাবল-এন্ট্রি হিসাব:</b> প্রতিটি লেনদেনে ডেবিট আর ক্রেডিট সমান থাকে। ট্রায়াল ব্যালেন্স ও ব্যালেন্স শিট সরাসরি রিপোর্ট থেকে দেখা যায়।</li>
+    <li><b>কিছুই মুছে যায় না:</b> ভুল হলে ডকুমেন্ট <b>Void</b> করা হয়, delete না। এতে পুরনো হিসাব নিরাপদ থাকে।</li>
+    <li><b>অডিট লগ:</b> কে কখন কী তৈরি, বদল বা Void করেছে, সব রেকর্ড থাকে।</li>
+    <li><b>রোলভিত্তিক অনুমতি:</b> প্রত্যেক কর্মী শুধু তার কাজের মেনুগুলোই দেখে।</li>
+  </ul>
+</section>
+
+<section>
+  <h2>২. লগইন ও পাসওয়ার্ড</h2>
+  <ol>
+    <li>ব্রাউজারে <b>https://insider.scalebbd.com</b> খুলুন।</li>
+    <li>তিনটি ঘর পূরণ করুন:
+      <table>
+        <tr><th>ঘর</th><th>কী লিখবেন</th></tr>
+        <tr><td>Agency code</td><td>আপনার এজেন্সির কোড, যেমন <code>scaleb</code>। সব কর্মীর জন্য একই।</td></tr>
+        <tr><td>Username</td><td>প্রত্যেকের নিজের ইউজারনেম (মালিকের জন্য <code>owner</code>)।</td></tr>
+        <tr><td>Password</td><td>নিজের পাসওয়ার্ড। বড় ও ছোট হাতের অক্ষর আলাদা ধরা হয়।</td></tr>
+      </table>
+    </li>
+    <li><span class="menu">Sign in</span> চাপুন। আপনি Dashboard-এ পৌঁছে যাবেন।</li>
+  </ol>
+  <h3>পাসওয়ার্ড বদলানো</h3>
+  <p>উপরে ডানদিকে আপনার নামের উপর ক্লিক করে <span class="menu">Account</span> খুলুন, তারপর নতুন পাসওয়ার্ড দিন। কমপক্ষে ৮ অক্ষর দিন, অক্ষর আর সংখ্যা মিশিয়ে।</p>
+  <div class="warn"><b>নিরাপত্তা</b>প্রথম লগইনের পরেই মালিকের পাসওয়ার্ড বদলে ফেলুন। একজনের পাসওয়ার্ড অন্যকে দেবেন না। প্রত্যেক কর্মীর জন্য আলাদা ইউজার খুলুন (অধ্যায় ১৭)। তাহলে অডিট লগে বোঝা যাবে কে কোন কাজ করেছে।</div>
+  <p>কাজ শেষে নামের মেনু থেকে <span class="menu">Sign out</span> করুন, বিশেষ করে শেয়ার করা কম্পিউটারে।</p>
+</section>
+
+<section>
+  <h2>৩. স্ক্রিন পরিচিতি</h2>
+  <table>
+    <tr><th>অংশ</th><th>কাজ</th></tr>
+    <tr><td>বাম পাশের মেনু (Sidebar)</td><td>সব মডিউল: ইনভয়েস, রিফান্ড, Money Receipt, Accounts, রিপোর্ট, Configuration ইত্যাদি। কোনো মেনুতে ক্লিক করলে তার ভেতরের পেজগুলো খোলে।</td></tr>
+    <tr><td>উপরের সার্চ বার</td><td>পেজ, ইনভয়েস নম্বর, ক্লায়েন্ট বা টিকেট নম্বর লিখে সরাসরি খুঁজে যাওয়া যায়।</td></tr>
+    <tr><td>ঘণ্টা আইকন</td><td>নোটিফিকেশন, যেমন হিসাবে গরমিল ধরা পড়লে বা পাসপোর্টের মেয়াদ শেষ হয়ে আসলে।</td></tr>
+    <tr><td>নামের মেনু</td><td>Account (পাসওয়ার্ড), Sign out। প্ল্যাটফর্ম অ্যাডমিন হলে Platform admin।</td></tr>
+    <tr><td>লিস্ট পেজ</td><td>উপরে ফিল্টার থাকে (তারিখ, ক্লায়েন্ট, স্ট্যাটাস), নিচে পেজ নম্বর। অনেক ডেটা থাকলেও দ্রুত খোলে।</td></tr>
+  </table>
+  <div class="tip"><b>টিপ</b>সব তারিখ বাংলাদেশ সময়ে দেখায়, আর সব টাকার অঙ্ক BDT-তে, দুই দশমিক ঘর পর্যন্ত।</div>
+</section>
+
+<section>
+  <h2>৪. প্রথম দিনের সেটআপ (ধাপে ধাপে)</h2>
+  <p>ইনভয়েস করার আগে একবার এগুলো সেট করে নিন। সব পাবেন <span class="menu">Configuration</span> মেনুতে।</p>
+  <table>
+    <tr><th>#</th><th>পেজ</th><th>কী করবেন</th></tr>
+    <tr><td>১</td><td>Agency Profile</td><td>এজেন্সির নাম, ঠিকানা, ফোন, ইমেইল, লোগো। এগুলো ইনভয়েস ও রিসিপ্টের PDF-এ ছাপা হয়।</td></tr>
+    <tr><td>২</td><td>App Config</td><td>ইনভয়েস নম্বরের ধরন, ডিফল্ট সেটিং, SMS চালু বা বন্ধ।</td></tr>
+    <tr><td>৩</td><td>Departments, Designations, Employees</td><td>কর্মীদের তালিকা। ইনভয়েসের "Sold by" ঘরে আর বেতনে এগুলো লাগে।</td></tr>
+    <tr><td>৪</td><td>Roles, Users</td><td>কোন রোল কোন মেনু দেখবে ঠিক করুন, তারপর প্রত্যেক কর্মীর জন্য ইউজার খুলুন।</td></tr>
+    <tr><td>৫</td><td>Airlines, Airports, Countries</td><td>টিকেট ইনভয়েসে যে এয়ারলাইন আর রুট লাগবে।</td></tr>
+    <tr><td>৬</td><td>Products, Visa Types, Room Types, Transport Types, Tour Itinerary</td><td>অন্যান্য ইনভয়েসে যে পণ্য বা সেবা বিক্রি করবেন।</td></tr>
+    <tr><td>৭</td><td>Client Categories, Companies, Groups, Maharam, Passport Status</td><td>প্রয়োজন অনুযায়ী।</td></tr>
+    <tr><td>৮</td><td>Accounts → Accounts List</td><td>ক্যাশ, ব্যাংক ও মোবাইল ব্যাংকিং (bKash/Nagad) অ্যাকাউন্ট খুলুন, শুরুর ব্যালেন্স (opening balance) সহ।</td></tr>
+    <tr><td>৯</td><td>Clients, Vendors, Agents</td><td>বর্তমান ক্লায়েন্ট আর ভেন্ডর যোগ করুন। আগের পাওনা বা দেনা থাকলে opening balance দিন (অধ্যায় ৫)।</td></tr>
+  </table>
+  <div class="tip"><b>টিপ</b>সব একবারে করার দরকার নেই। প্রথমে ১, ৪, ৫, ৮ আর ৯ করে নিলেই এয়ার টিকেট ইনভয়েস শুরু করা যায়।</div>
+</section>
+
+<section>
+  <h2>৫. ক্লায়েন্ট, ভেন্ডর ও এজেন্ট</h2>
+  <table>
+    <tr><th>ধরন</th><th>কে</th><th>মেনু</th></tr>
+    <tr><td>Client</td><td>যার কাছে বিক্রি করেন (ব্যক্তি বা কোম্পানি)। তার কাছে আপনার <b>পাওনা</b> থাকে।</td><td>Clients → Clients</td></tr>
+    <tr><td>Vendor</td><td>যার কাছ থেকে কেনেন (এয়ারলাইন, কনসোলিডেটর, হোটেল, ভিসা এজেন্ট)। তার কাছে আপনার <b>দেনা</b> থাকে।</td><td>Vendors → Vendors</td></tr>
+    <tr><td>Agent</td><td>যে ক্লায়েন্ট এনে দেয় আর কমিশন পায়।</td><td>Agents → Agent Profiles</td></tr>
+    <tr><td>Combined Client</td><td>যে একই সাথে ক্লায়েন্ট আর ভেন্ডর, অর্থাৎ আপনি তার কাছে বিক্রিও করেন, কেনেনও।</td><td>Clients → Combined Clients</td></tr>
+  </table>
+  <h3>নতুন ক্লায়েন্ট যোগ</h3>
+  <ol>
+    <li><span class="menu">Clients → Clients</span> খুলে <span class="menu">New</span> চাপুন।</li>
+    <li>নাম, ফোন (01XXXXXXXXX), ইমেইল, ঠিকানা দিন। ধরন বেছে নিন: ব্যক্তি বা কর্পোরেট।</li>
+    <li>আগের বকেয়া থাকলে <b>Opening balance</b> দিন: ক্লায়েন্ট আপনার কাছে ঋণী হলে পাওনা হিসেবে, অগ্রিম দিয়ে রাখলে অগ্রিম হিসেবে।</li>
+    <li>Save চাপুন। প্রতিটি ক্লায়েন্ট নিজে থেকে একটা কোড পায়।</li>
+  </ol>
+  <p>ক্লায়েন্টের নামে ক্লিক করলে তার <b>লেজার</b> দেখা যায়: সব ইনভয়েস, পেমেন্ট আর বর্তমান ব্যালেন্স।</p>
+  <h3>Combined Client ও Set-off</h3>
+  <p>Combined client-এর পাওনা আর দেনা আলাদা থাকে, পেজে পাশাপাশি দেখায়, আর নিচে নিট হিসাব। দুই দিকেই টাকা থাকলে <span class="menu">Set-off</span> দিয়ে একটা দিয়ে আরেকটা কাটাকাটি করা যায়। তখন ক্লায়েন্টের সবচেয়ে পুরনো বকেয়া ইনভয়েস থেকে আগে মেটে।</p>
+</section>
+
+<section>
+  <h2>৬. এয়ার টিকেট ইনভয়েস</h2>
+  <p>মেনু: <span class="menu">Invoice (Air Ticket) → New Invoice</span></p>
+  <h3>উপরের অংশ (Invoice)</h3>
+  <table>
+    <tr><th>ঘর</th><th>বিবরণ</th></tr>
+    <tr><td>Client</td><td>নাম, কোড বা ফোন লিখে খুঁজুন। তালিকায় না থাকলে আগে ক্লায়েন্ট যোগ করুন।</td></tr>
+    <tr><td>Invoice date</td><td>বিক্রির তারিখ (ডিফল্ট আজ)।</td></tr>
+    <tr><td>Due date (ঐচ্ছিক)</td><td>টাকা দেওয়ার শেষ তারিখ।</td></tr>
+    <tr><td>Sold by (ঐচ্ছিক)</td><td>কোন কর্মী বিক্রি করেছেন।</td></tr>
+    <tr><td>Referred by agent, Agent commission (ঐচ্ছিক)</td><td>এজেন্ট ক্লায়েন্ট এনে দিলে তার নাম আর কমিশনের অঙ্ক।</td></tr>
+  </table>
+  <h3>টিকেটের অংশ (Ticket 1, 2 …)</h3>
+  <table>
+    <tr><th>ঘর</th><th>বিবরণ</th></tr>
+    <tr><td>Ticket no, PNR</td><td>টিকেট নম্বর আর বুকিং রেফারেন্স।</td></tr>
+    <tr><td>Airline, Vendor</td><td>কোন এয়ারলাইনের টিকেট, আর কার কাছ থেকে কিনেছেন।</td></tr>
+    <tr><td>Passenger name, Type, Passport no</td><td>যাত্রীর তথ্য। Type হলো Adult, Child বা Infant।</td></tr>
+    <tr><td>Route, Class</td><td>যেমন <code>DAC-DXB-DAC</code>, আর ক্লাস (Economy ইত্যাদি)।</td></tr>
+    <tr><td>Journey date, Return date</td><td>যাত্রা আর ফেরার তারিখ।</td></tr>
+    <tr><td>GDS, GDS PNR</td><td>যে সিস্টেমে বুক করেছেন (Sabre, Galileo ইত্যাদি)।</td></tr>
+    <tr><td>Base fare, Taxes</td><td>মূল ভাড়া, আর <span class="menu">+ Tax</span> চেপে একেক ট্যাক্স কোড আলাদা করে যোগ।</td></tr>
+    <tr><td>Commission %</td><td>এয়ারলাইন থেকে পাওয়া কমিশনের হার। কমিশন আর AIT নিজে থেকে হিসাব হয়।</td></tr>
+    <tr><td>Client price</td><td>ক্লায়েন্টের কাছ থেকে কত নেবেন।</td></tr>
+  </table>
+  <p>একই ইনভয়েসে একাধিক যাত্রী থাকলে <span class="menu">Add ticket</span> চাপুন। নিচে মোট বিক্রি, কেনা দাম আর লাভ দেখায়। <span class="menu">Save</span> চাপার পর ইনভয়েস নম্বর তৈরি হয়, আর হিসাবে এগুলো পোস্ট হয়:</p>
+  <ul>
+    <li>ক্লায়েন্টের কাছে পাওনা বাড়ে (Client price)।</li>
+    <li>ভেন্ডরের কাছে দেনা বাড়ে (কেনা দাম)।</li>
+    <li>পার্থক্যটা আপনার আয় হিসেবে যায়।</li>
+  </ul>
+  <h3>ইনভয়েস দেখা, প্রিন্ট ও PDF</h3>
+  <p><span class="menu">View Invoices</span> খুললে সব ইনভয়েস দেখা যায়, তারিখ, ক্লায়েন্ট আর স্ট্যাটাস দিয়ে ফিল্টার করা যায়। ইনভয়েস খুলে <span class="menu">Print / PDF</span> চাপলে এজেন্সির লোগো সহ ইনভয়েস তৈরি হয়, ক্লায়েন্টকে পাঠানোর জন্য।</p>
+  <div class="tip"><b>Non Commission ইনভয়েস</b>যে টিকেটে এয়ারলাইন কমিশন নেই, সেগুলো <span class="menu">Invoice (Non Commission)</span> থেকে করুন। ঘরগুলো একই রকম, শুধু কমিশনের হিসাব নেই।</div>
+</section>
+
+<section>
+  <h2>৭. অন্যান্য ইনভয়েস</h2>
+  <table>
+    <tr><th>মেনু</th><th>কখন ব্যবহার করবেন</th></tr>
+    <tr><td>Invoice (Visa)</td><td>ভিসা প্রসেসিং বিক্রি। দেশ, ভিসার ধরন আর পাসপোর্ট দিন। <b>Visa Process</b> পেজে প্রতিটি ভিসার অবস্থা (জমা, অনুমোদিত, ডেলিভারি) ট্র্যাক করুন।</td></tr>
+    <tr><td>Invoice (Tour Package)</td><td>ট্যুর প্যাকেজ: হোটেল, রুমের ধরন, পরিবহন, গাইড, ইটিনেরারি।</td></tr>
+    <tr><td>Invoice (Umrah)</td><td>উমরাহ প্যাকেজ বিক্রি।</td></tr>
+    <tr><td>Invoice (Other Package)</td><td>অন্য যেকোনো প্যাকেজ।</td></tr>
+    <tr><td>Invoice (Other)</td><td>হোটেল বুকিং, ইন্স্যুরেন্স, বাস বা ট্রেনের টিকেট ইত্যাদি একক সেবা (Products থেকে)।</td></tr>
+  </table>
+  <p>সব ইনভয়েসের মূল নিয়ম একই: <b>ক্লায়েন্ট বেছে নিন → লাইন যোগ করুন (কী বিক্রি, কার কাছ থেকে কেনা, কেনা দাম, বিক্রি দাম) → Save</b>। পাওনা, দেনা আর লাভ নিজে থেকে হিসাবে চলে যায়।</p>
+</section>
+
+<section>
+  <h2>৮. হজ্জ ও হাজী ব্যবস্থাপনা</h2>
+  <h3>Hajj মেনু</h3>
+  <ul>
+    <li><b>Pre Registration Invoice:</b> প্রাক-নিবন্ধনের ফি আর হাজীর তথ্য।</li>
+    <li><b>Hajj Invoice:</b> মূল হজ্জ প্যাকেজের ইনভয়েস।</li>
+    <li><b>Hajj Registration:</b> নিবন্ধিত হাজীদের তালিকা আর তথ্য।</li>
+  </ul>
+  <h3>Hajji Management মেনু</h3>
+  <ul>
+    <li><b>Moallem Transfer / Group Transfer:</b> হাজীকে এক মোয়াল্লেম বা গ্রুপ থেকে আরেকটিতে সরানো। তালিকা পেজে আগের সব ট্রান্সফার দেখা যায়।</li>
+    <li><b>Transfer In / Transfer Out:</b> অন্য এজেন্সি থেকে হাজী আসা, বা অন্য এজেন্সিতে চলে যাওয়া।</li>
+    <li><b>Cancel Pre Registration / Cancel Registration:</b> নিবন্ধন বাতিল। টাকা ফেরত দিতে হলে <span class="menu">Refund → Other Package &amp; Hajj</span> ব্যবহার করুন।</li>
+  </ul>
+  <p>মহিলা হাজীর সাথে মাহরামের সম্পর্ক রাখতে <span class="menu">Configuration → Maharam</span>-এ ধরনগুলো আগে যোগ করে নিন।</p>
+</section>
+
+<section>
+  <h2>৯. টাকা গ্রহণ: Money Receipt</h2>
+  <p>মেনু: <span class="menu">Money Receipt → Invoice Money Receipt</span> → New</p>
+  <ol>
+    <li>ক্লায়েন্ট বেছে নিন। তার বকেয়া ইনভয়েসগুলোর তালিকা দেখাবে।</li>
+    <li>কত টাকা পেলেন আর কোন অ্যাকাউন্টে এলো (Cash, ব্যাংক, bKash…) দিন। চেক হলে চেক নম্বর আর তারিখ দিন।</li>
+    <li>টাকাটা নিজে থেকে <b>সবচেয়ে পুরনো বকেয়া ইনভয়েস থেকে</b> ভাগ হয়ে বসে যায়। চাইলে হাতে বদলে নির্দিষ্ট ইনভয়েসে বসাতে পারেন।</li>
+    <li>বকেয়ার চেয়ে বেশি টাকা দিলে বাড়তিটা ক্লায়েন্টের <b>অগ্রিম</b> হিসেবে থাকে। পরের ইনভয়েসে কাজে লাগানো যায়।</li>
+    <li>Save করুন, তারপর রিসিপ্টের PDF প্রিন্ট করে ক্লায়েন্টকে দিন।</li>
+  </ol>
+  <p><b>Advance Return:</b> ক্লায়েন্টের অগ্রিম টাকা ফেরত দিলে এই পেজ ব্যবহার করুন।</p>
+  <div class="tip"><b>টিপ</b>ইনভয়েসের পেজ থেকেও সরাসরি "Receive payment" করা যায়। তখন ক্লায়েন্ট আর ইনভয়েস আগে থেকেই বাছাই করা থাকে।</div>
+</section>
+
+<section>
+  <h2>১০. ভেন্ডর ও এজেন্ট পেমেন্ট</h2>
+  <h3>Vendor Payment</h3>
+  <ol>
+    <li><span class="menu">Vendors → Vendor Payment</span> → New।</li>
+    <li>ভেন্ডর, অঙ্ক, কোন অ্যাকাউন্ট থেকে দিলেন, আর তারিখ দিন।</li>
+    <li>Save চাপলে ভেন্ডরের দেনা কমে, আর ক্যাশ বা ব্যাংক ব্যালেন্সও কমে।</li>
+  </ol>
+  <p>ভেন্ডরকে আগাম টাকা দিয়ে রাখলে সেটা অগ্রিম হিসেবে থাকে। ভেন্ডর সেই টাকা ফেরত দিলে <span class="menu">Vendors → Advance Return</span> ব্যবহার করুন।</p>
+  <h3>Agent Payment</h3>
+  <p><span class="menu">Agents → Agent Payment</span>: ইনভয়েসে লেখা এজেন্ট কমিশন যখন পরিশোধ করবেন।</p>
+</section>
+
+<section>
+  <h2>১১. রিইস্যু ও রিফান্ড</h2>
+  <h3>Reissue (Air Ticket)</h3>
+  <p>যাত্রী তারিখ বা রুট বদলালে <span class="menu">Reissue (Air Ticket) → New Reissue</span> ব্যবহার করুন। আগের টিকেট বেছে নিয়ে নতুন টিকেট নম্বর, ভাড়ার পার্থক্য, এয়ারলাইনের পেনাল্টি আর আপনার সার্ভিস চার্জ দিন। শুধু বাড়তি অঙ্কটাই ক্লায়েন্ট আর ভেন্ডরের হিসাবে যোগ হয়।</p>
+  <h3>Refund</h3>
+  <table>
+    <tr><th>মেনু</th><th>কখন</th></tr>
+    <tr><td>Air Ticket</td><td>পুরো টিকেট বাতিল আর টাকা ফেরত।</td></tr>
+    <tr><td>Partial</td><td>টিকেটের একটা অংশ (যেমন শুধু ফেরার অংশ) রিফান্ড।</td></tr>
+    <tr><td>Tour Package</td><td>ট্যুর প্যাকেজ বাতিল।</td></tr>
+    <tr><td>Other Package &amp; Hajj</td><td>অন্যান্য প্যাকেজ বা হজ্জ বাতিল।</td></tr>
+    <tr><td>Others</td><td>অন্যান্য সেবা।</td></tr>
+  </table>
+  <p>রিফান্ডে চারটা অঙ্ক দেবেন:</p>
+  <ul>
+    <li>ভেন্ডর বা এয়ারলাইন কত ফেরত দিল।</li>
+    <li>তারা কত চার্জ কাটল।</li>
+    <li>আপনি ক্লায়েন্টের কাছ থেকে কত চার্জ নিলেন।</li>
+    <li>ক্লায়েন্টকে কত ফেরত দিলেন।</li>
+  </ul>
+  <p>সফটওয়্যার বাকিটা হিসাব করে: ক্লায়েন্ট আর ভেন্ডরের ব্যালেন্স ঠিক করে, আর রিফান্ডে আপনার লাভ বা ক্ষতি দেখায়। <b>Create</b> দিয়ে নতুন রিফান্ড, <b>History</b> দিয়ে আগের সব রিফান্ড দেখুন।</p>
+</section>
+
+<section>
+  <h2>১২. ভুল সংশোধন: Void</h2>
+  <p>কোনো ইনভয়েস, রিসিপ্ট, পেমেন্ট বা ভাউচারে ভুল হলে সেটা delete করা যায় না। ডকুমেন্ট খুলে <span class="menu">Void</span> চাপুন আর কারণ লিখুন।</p>
+  <ul>
+    <li>Void করলে ওই ডকুমেন্টের হিসাব উল্টো এন্ট্রি দিয়ে বাতিল হয়। আগের এন্ট্রি মুছে যায় না, তাই অডিটে সব দেখা যায়।</li>
+    <li>ডকুমেন্টটা "VOID" চিহ্ন নিয়ে তালিকায় থেকে যায়।</li>
+    <li>এরপর সঠিক তথ্য দিয়ে নতুন ডকুমেন্ট তৈরি করুন।</li>
+    <li>সব Void হওয়া ডকুমেন্ট দেখতে <span class="menu">Reports → Void List</span> খুলুন।</li>
+  </ul>
+  <div class="warn"><b>মনে রাখবেন</b>কোনো ইনভয়েসে টাকা বসানো থাকলে (Money Receipt) আগে সেই রিসিপ্ট Void করতে হতে পারে, তারপর ইনভয়েস। স্ক্রিনে কী করতে হবে বলে দেবে।</div>
+</section>
+
+<section>
+  <h2>১৩. অ্যাকাউন্টস, চেক ও ব্যাংক</h2>
+  <table>
+    <tr><th>পেজ</th><th>কাজ</th></tr>
+    <tr><td>Accounts List</td><td>ক্যাশ, ব্যাংক আর মোবাইল ব্যাংকিং অ্যাকাউন্ট, প্রতিটার ব্যালেন্স সহ।</td></tr>
+    <tr><td>Transaction History</td><td>প্রতিটি অ্যাকাউন্টে কবে কত টাকা এলো আর গেল।</td></tr>
+    <tr><td>Balance Status</td><td>সব অ্যাকাউন্টের বর্তমান ব্যালেন্স এক নজরে।</td></tr>
+    <tr><td>Balance Transfer</td><td>এক অ্যাকাউন্ট থেকে আরেকটায় টাকা সরানো, যেমন ক্যাশ ব্যাংকে জমা, বা ব্যাংক থেকে bKash।</td></tr>
+    <tr><td>Bill Adjustment</td><td>ক্লায়েন্ট বা ভেন্ডরের ব্যালেন্সে ছোটখাটো সমন্বয় (ছাড়, রাউন্ডিং)।</td></tr>
+    <tr><td>Non Invoice Income</td><td>ইনভয়েস ছাড়া আয়, যেমন ব্যাংকের সুদ।</td></tr>
+    <tr><td>Incentive Income</td><td>এয়ারলাইন বা ভেন্ডরের থেকে পাওয়া ইনসেনটিভ বা বোনাস।</td></tr>
+    <tr><td>Investments</td><td>মালিকের বিনিয়োগ বা মূলধন।</td></tr>
+  </table>
+  <h3>Cheque Management</h3>
+  <p>পাওয়া বা দেওয়া সব চেকের তালিকা। চেক ক্লিয়ার হলে স্ট্যাটাস <b>Cleared</b> করুন, ফেরত এলে <b>Bounced</b> করুন। বাউন্স করলে হিসাবও সেই অনুযায়ী ঠিক হয়।</p>
+</section>
+
+<section>
+  <h2>১৪. খরচ, বেতন, লোন ও বিনিয়োগ</h2>
+  <h3>Expense</h3>
+  <ol>
+    <li><span class="menu">Expense Heads</span>-এ খরচের খাত যোগ করুন: অফিস ভাড়া, বিদ্যুৎ, ইন্টারনেট, আপ্যায়ন ইত্যাদি।</li>
+    <li><span class="menu">Add Expense</span>: খাত, অঙ্ক, কোন অ্যাকাউন্ট থেকে, তারিখ আর নোট দিয়ে Save করুন।</li>
+    <li><span class="menu">Expense History</span>-তে সব খরচ দেখুন আর ফিল্টার করুন।</li>
+  </ol>
+  <h3>Payroll</h3>
+  <p><span class="menu">Payroll</span>: মাসিক বেতন পরিশোধ। <span class="menu">Employee Advance</span>: কর্মীকে অগ্রিম দেওয়া টাকা, যা পরের বেতন থেকে কাটা যায়।</p>
+  <h3>Loan &amp; Investments</h3>
+  <ul>
+    <li><b>Authority:</b> যার কাছ থেকে লোন নিয়েছেন বা যাকে দিয়েছেন (ব্যাংক, ব্যক্তি)।</li>
+    <li><b>Loan Information:</b> লোনের অঙ্ক, শর্ত আর বাকি।</li>
+    <li><b>Received Investment:</b> বাইরে থেকে আসা বিনিয়োগ।</li>
+    <li><b>Payments:</b> কিস্তি বা লোন পরিশোধ।</li>
+  </ul>
+</section>
+
+<section>
+  <h2>১৫. কোটেশন ও পাসপোর্ট</h2>
+  <h3>Quotation</h3>
+  <p>ক্লায়েন্টকে দামের প্রস্তাব পাঠাতে <span class="menu">Quotation → New Quotation</span> খুলুন। কোটেশনে হিসাবে কিছু পোস্ট হয় না। PDF পাঠিয়ে দিন। ক্লায়েন্ট রাজি হলে কোটেশন থেকে ইনভয়েসে রূপান্তর করুন।</p>
+  <h3>Passport Management</h3>
+  <ul>
+    <li><b>Add Passport:</b> পাসপোর্ট নম্বর, নাম, জন্মতারিখ, মেয়াদ, আর স্ক্যান কপি (ছবি বা PDF আপলোড)।</li>
+    <li><b>Passport List:</b> সব পাসপোর্ট, আর প্রতিটির অবস্থা (জমা নেওয়া, ভিসার জন্য পাঠানো, ফেরত দেওয়া), যা <span class="menu">Configuration → Passport Status</span> থেকে সাজানো যায়।</li>
+    <li>পাসপোর্টের মেয়াদ শেষ হয়ে আসলে নোটিফিকেশন আসে। SMS চালু থাকলে ক্লায়েন্টকে রিমাইন্ডারও যায়।</li>
+  </ul>
+</section>
+
+<section>
+  <h2>১৬. রিপোর্ট</h2>
+  <p>সব রিপোর্টে উপরে ফিল্টার (তারিখের সীমা, ক্লায়েন্ট, ভেন্ডর ইত্যাদি), মাঝে টেবিল, নিচে মোট থাকে। প্রতিটা রিপোর্ট <b>Excel</b> বা <b>PDF</b> হিসেবে ডাউনলোড করা যায়।</p>
+  <table>
+    <tr><th>রিপোর্ট</th><th>কী দেখায়</th></tr>
+    <tr><td>Ledgers</td><td>যেকোনো ক্লায়েন্ট, ভেন্ডর, এজেন্ট বা অ্যাকাউন্টের পুরো খতিয়ান, শুরুর আর শেষের ব্যালেন্স সহ।</td></tr>
+    <tr><td>Due &amp; Advance</td><td>কোন ক্লায়েন্টের কাছে কত পাওনা, কে অগ্রিম দিয়ে রেখেছে। টাকা আদায়ের জন্য প্রতিদিন দেখুন।</td></tr>
+    <tr><td>Sales</td><td>সময়, কর্মী, ক্লায়েন্ট আর ইনভয়েসের ধরন অনুযায়ী বিক্রি।</td></tr>
+    <tr><td>Profit &amp; Loss</td><td>নির্দিষ্ট সময়ের আয়, খরচ আর নিট লাভ।</td></tr>
+    <tr><td>Expense</td><td>খাত অনুযায়ী খরচ।</td></tr>
+    <tr><td>Air Ticket</td><td>এয়ারলাইন, রুট আর ভেন্ডর অনুযায়ী টিকেট বিক্রি ও কমিশন।</td></tr>
+    <tr><td>Passport, Passenger Lists</td><td>পাসপোর্টের অবস্থা আর যাত্রীদের তালিকা।</td></tr>
+    <tr><td>Void List</td><td>সব বাতিল ডকুমেন্ট আর বাতিলের কারণ।</td></tr>
+    <tr><td>Other Reports</td><td>অন্যান্য বিশেষ রিপোর্ট।</td></tr>
+    <tr><td>Trial Balance &amp; Balance Sheet</td><td>পূর্ণ হিসাবের সারাংশ, অ্যাকাউন্ট্যান্ট বা অডিটরের জন্য।</td></tr>
+  </table>
+  <div class="tip"><b>টিপ</b>বড় রিপোর্টের PDF তৈরি হতে কয়েক সেকেন্ড লাগতে পারে। তারিখের সীমা ছোট রাখলে দ্রুত হয়।</div>
+</section>
+
+<section>
+  <h2>১৭. ইউজার, রোল ও অনুমতি</h2>
+  <ol>
+    <li><span class="menu">Configuration → Roles</span>: রোল তৈরি করুন, যেমন "Sales", "Accountant", "Manager"। প্রতিটি মডিউলে কী করা যাবে টিক দিন: দেখা, তৈরি, সম্পাদনা, Void।</li>
+    <li><span class="menu">Configuration → Users</span>: নতুন ইউজার, যেখানে username, নাম, রোল আর শুরুর পাসওয়ার্ড দেবেন। চাইলে তাকে একজন Employee-এর সাথে যুক্ত করুন।</li>
+    <li>কর্মীকে Agency code, username আর পাসওয়ার্ড দিন। তিনি প্রথম লগইনে নিজের পাসওয়ার্ড বদলে নেবেন।</li>
+    <li>কেউ চাকরি ছেড়ে গেলে ইউজারটা <b>নিষ্ক্রিয়</b> করুন। তার পুরনো কাজের রেকর্ড থেকে যায়।</li>
+  </ol>
+  <div class="tip"><b>পরামর্শ</b>বিক্রির কর্মীকে Void আর Accounts-এর অনুমতি না দেওয়াই ভালো। মালিক বা অ্যাকাউন্ট্যান্ট নিয়মিত অডিট লগ আর Void List দেখবেন।</div>
+</section>
+
+<section>
+  <h2>১৮. SMS ও ব্যাকআপ</h2>
+  <h3>SMS</h3>
+  <p><span class="menu">Configuration → SMS</span>-এ SMS পাঠানো চালু করুন আর মেসেজের টেমপ্লেট ঠিক করুন। SMS গেটওয়ে সার্ভারে সেট করা থাকতে হবে। গেটওয়ে না থাকলে মেসেজ শুধু লগে লেখা থাকে, পাঠানো হয় না। নম্বরগুলো <code>8801XXXXXXXXX</code> রূপে পাঠানো হয়।</p>
+  <h3>Database Backup</h3>
+  <p><span class="menu">Configuration → Database Backup</span> থেকে পুরো ডেটার ব্যাকআপ ডাউনলোড করুন। পাসপোর্ট স্ক্যান আর রিসিপ্টের ছবিও ডাটাবেসে থাকে, তাই এক ব্যাকআপেই সব থাকে। সপ্তাহে অন্তত একবার ব্যাকআপ নিয়ে কম্পিউটারের বাইরে রাখুন, যেমন Google Drive বা পেনড্রাইভে।</p>
+  <h3>স্বয়ংক্রিয় কাজ</h3>
+  <ul>
+    <li><b>প্রতি রাত ১:৩০:</b> সব হিসাব মিলছে কিনা পরীক্ষা হয়। গরমিল পেলে অ্যাকাউন্ট্যান্টের কাছে নোটিফিকেশন যায়।</li>
+    <li><b>প্রতিদিন সকাল ৯:০০:</b> পাসপোর্টের মেয়াদ শেষের রিমাইন্ডার যায় আর পুরনো নোটিফিকেশন পরিষ্কার হয়।</li>
+  </ul>
+</section>
+
+<section>
+  <h2>১৯. দৈনিক কাজের চেকলিস্ট</h2>
+  <h3>প্রতিদিন</h3>
+  <ul>
+    <li>☐ প্রতিটি বিক্রির ইনভয়েস সেদিনই তৈরি করুন।</li>
+    <li>☐ যত টাকা পেয়েছেন, প্রতিটির Money Receipt দিন।</li>
+    <li>☐ ভেন্ডরকে যত টাকা দিয়েছেন, প্রতিটির Vendor Payment দিন।</li>
+    <li>☐ খরচগুলো Add Expense-এ তুলুন।</li>
+    <li>☐ দিনের শেষে <b>Balance Status</b>-এর ক্যাশ ব্যালেন্স আর হাতের ক্যাশ মিলিয়ে দেখুন।</li>
+    <li>☐ <b>Due &amp; Advance</b> রিপোর্ট দেখে বকেয়া ক্লায়েন্টদের ফোন করুন।</li>
+  </ul>
+  <h3>সপ্তাহে / মাসে</h3>
+  <ul>
+    <li>☐ ব্যাংক স্টেটমেন্টের সাথে ব্যাংক অ্যাকাউন্টের Transaction History মেলান।</li>
+    <li>☐ ভেন্ডরের স্টেটমেন্টের সাথে ভেন্ডর লেজার মেলান।</li>
+    <li>☐ চেকের স্ট্যাটাস হালনাগাদ করুন।</li>
+    <li>☐ মাসের শেষে বেতন (Payroll), Profit &amp; Loss আর Balance Sheet দেখুন।</li>
+    <li>☐ Database Backup নিন।</li>
+  </ul>
+</section>
+
+<section>
+  <h2>২০. সমস্যা ও সমাধান</h2>
+  <table>
+    <tr><th>সমস্যা</th><th>সমাধান</th></tr>
+    <tr><td>"Sign-in could not be completed"</td><td>Agency code, username আর পাসওয়ার্ড আবার দেখুন (বড়/ছোট হাতের অক্ষর)। তবুও না হলে অ্যাডমিনকে জানান।</td></tr>
+    <tr><td>"Application error: a client-side exception…"</td><td>কীবোর্ডে <b>Ctrl + Shift + R</b> চাপুন (পেজ নতুন করে লোড হবে)। না হলে ব্রাউজারের cache মুছে আবার চেষ্টা করুন।</td></tr>
+    <tr><td>পেজ খালি সাদা, বা "503 Service Unavailable"</td><td>সার্ভার নতুন করে চালু হচ্ছে। ১–২ মিনিট অপেক্ষা করে আবার খুলুন। বারবার হলে অ্যাডমিনকে জানান। সমাধান DEPLOYMENT.md-তে লেখা আছে।</td></tr>
+    <tr><td>কোনো মেনু দেখা যাচ্ছে না</td><td>আপনার রোলে সেই মডিউলের অনুমতি নেই। অ্যাডমিন Roles থেকে অনুমতি দেবেন।</td></tr>
+    <tr><td>ক্লায়েন্ট বা ভেন্ডর খুঁজে পাচ্ছেন না</td><td>নামের কয়েক অক্ষর, কোড বা ফোন নম্বর লিখে খুঁজুন। না থাকলে আগে যোগ করুন।</td></tr>
+    <tr><td>ইনভয়েসে ভুল অঙ্ক</td><td>ইনভয়েসটা Void করে (কারণ লিখে) নতুন করে তৈরি করুন। আগে টাকা বসানো থাকলে রিসিপ্টও Void করতে হতে পারে।</td></tr>
+    <tr><td>PDF খুলতে দেরি হচ্ছে</td><td>বড় রিপোর্টে স্বাভাবিক। তারিখের সীমা ছোট করুন।</td></tr>
+    <tr><td>পাসওয়ার্ড ভুলে গেছেন</td><td>মালিক বা অ্যাডমিন <span class="menu">Configuration → Users</span> থেকে নতুন পাসওয়ার্ড সেট করে দেবেন।</td></tr>
+  </table>
+  <p class="small">মতামত বা সমস্যা জানাতে সফটওয়্যারের ভেতরের <span class="menu">Feedback</span> মেনু ব্যবহার করুন।</p>
+</section>
+
+</body>
+</html>

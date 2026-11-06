@@ -159,7 +159,30 @@ body {
   flex: 1;
 }
 
+.shell-search {
+  flex: 0 1 420px;
+  min-width: 0;
+}
+
+.shell-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 29;
+  background: rgba(12, 59, 52, 0.45);
+}
+
+@media (max-width: 768px) {
+  .shell-wide-only {
+    display: none !important;
+  }
+  .shell-header.ant-layout-header {
+    padding: 0 10px;
+    gap: 6px;
+  }
+}
+
 .shell-content {
+  min-width: 0;
   padding: 24px 28px 40px;
   min-height: calc(100vh - 64px);
   max-width: 1520px;

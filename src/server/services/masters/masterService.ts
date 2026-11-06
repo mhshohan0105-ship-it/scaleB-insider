@@ -160,6 +160,18 @@ export async function masterOptions(ctx: ServiceContext, key: EntityKey): Promis
   return rows.map((r) => ({ value: r.id, label: optionLabel(key, def, r) }));
 }
 
+/** Active rows per list (Settings home page). */
+export async function masterCounts(
+  ctx: ServiceContext,
+  keys: EntityKey[],
+): Promise<Record<string, number>> {
+  const db = tenantDb(ctx.agencyId);
+  const counts = await Promise.all(
+    keys.map((k) => delegate(db, ENTITIES[k].model).count({ where: { isActive: true } })),
+  );
+  return Object.fromEntries(keys.map((k, i) => [k, counts[i] ?? 0]));
+}
+
 /** Type-ahead search for large lists (parties). Always includes `includeId` if given. */
 export async function searchEntityOptions(
   ctx: ServiceContext,

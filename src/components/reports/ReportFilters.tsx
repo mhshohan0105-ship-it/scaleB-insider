@@ -32,6 +32,7 @@ interface Props {
   users?: FieldOption[];
   /** Label for the period filter (e.g. "Journey dates"). */
   periodLabel?: string;
+  fiscalYearStart?: number;
 }
 
 function Labelled({ label, children }: { label: string; children: React.ReactNode }) {
@@ -54,6 +55,7 @@ export function ReportFilters({
   groups = [],
   users = [],
   periodLabel = "Period",
+  fiscalYearStart,
 }: Props) {
   const { setParams } = useUrlParams();
   const has = (k: ReportFilterKind) => show.includes(k);
@@ -88,7 +90,7 @@ export function ReportFilters({
       )}
       {has("dateRange") && (
         <Labelled label={periodLabel}>
-          <DateRangeFilter from={params.from} to={params.to} />
+          <DateRangeFilter from={params.from} to={params.to} fiscalYearStart={fiscalYearStart} />
         </Labelled>
       )}
       {has("asOf") && (

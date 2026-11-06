@@ -40,11 +40,12 @@ export async function renderReport(
   const parsed = parseReportParams(raw);
   const params = { ...parsed, ...(opts.defaults?.(parsed) ?? {}) };
 
-  const [salesmen, airlines, groups, users] = await Promise.all([
+  const [salesmen, airlines, groups, users, config] = await Promise.all([
     opts.filters.includes("salesman") ? masterOptions(ctx, "employees") : Promise.resolve([]),
     opts.filters.includes("airline") ? masterOptions(ctx, "airlines") : Promise.resolve([]),
     opts.filters.includes("group") ? masterOptions(ctx, "groups") : Promise.resolve([]),
     opts.filters.includes("user") ? userOptions(ctx) : Promise.resolve([]),
+    getAppConfig(ctx),
   ]);
 
   let report;
@@ -71,6 +72,7 @@ export async function renderReport(
           groups={groups}
           users={users}
           periodLabel={opts.periodLabel}
+          fiscalYearStart={config.fiscalYearStart}
         />
       }
     />

@@ -6,7 +6,7 @@ import { createAirInvoice } from "@/server/services/invoices/airInvoiceService";
 import { saveMaster } from "@/server/services/masters/masterService";
 import { createMoneyReceipt } from "@/server/services/payments/receiptService";
 import { makeAgency } from "@/tests/integration/helpers";
-import { getDashboard } from "./dashboardService";
+import { getDashboard, redactDashboard } from "./dashboardService";
 
 let A: Awaited<ReturnType<typeof makeAgency>>;
 const today = todayIso();
@@ -100,5 +100,62 @@ describe("dashboard", () => {
       profit: "1810.00",
     });
     expect(d.ledgerHealthy).toBe(true);
+  });
+
+  it("gives the 30 day trend, comparisons, top dues and recent invoices", async () => {
+    const d = await getDashboard(A.ctx, { checkLedger: false });
+    expect(d.daily).toHaveLength(30);
+    expect(d.daily[29]).toEqual({ date: today, sales: "31900.00", collection: "12000.00" });
+    expect(d.daily[0]!.date).toBe(inDays(-29));
+    expect(d.previous).toEqual({
+      salesYesterday: "0.00",
+      collectionYesterday: "0.00",
+      salesLastMonth: "0.00",
+      collectionLastMonth: "0.00",
+    });
+    expect(d.topDues).toHaveLength(1);
+    expect(d.topDues[0]).toMatchObject({ name: "Top Client", balance: "19900.00" });
+    expect(d.recent[0]).toMatchObject({ clientName: "Top Client", netTotal: "31900.00" });
+    expect(d.overdue).toEqual({ count: 0, amount: "0.00", list: [] });
+  });
+
+  it("lists invoices past their due date", async () => {
+    const db = tenantDb(A.agency.id);
+    const client = await db.client.findFirstOrThrow({ where: { name: "Top Client" } });
+    const vendor = await db.vendor.findFirstOrThrow({ where: { name: "Dash Vendor" } });
+    const airline = await db.airline.findFirstOrThrow({ where: { iata: "QR" } });
+    const r = await createAirInvoice(A.ctx, {
+      clientId: client.id,
+      date: inDays(-10),
+      dueDate: inDays(-2),
+      tickets: [
+        {
+          ticketNo: "1570000000002",
+          airlineId: airline.id,
+          vendorId: vendor.id,
+          passengerName: "LATE PAX",
+          route: "DAC-DOH",
+          journeyDate: inDays(30),
+          baseFare: "1000",
+          taxes: [],
+          commissionPercent: "0",
+          clientPrice: "1500",
+        },
+      ],
+    });
+    const d = await getDashboard(A.ctx, { checkLedger: false });
+    expect(d.overdue.count).toBe(1);
+    expect(d.overdue.amount).toBe("1500.00");
+    expect(d.overdue.list[0]).toMatchObject({ number: r.number, due: "1500.00" });
+  });
+
+  it("removes what a role may not see", async () => {
+    const d = await getDashboard(A.ctx, { checkLedger: false });
+    const none = redactDashboard(d, { accounts: false, expense: false, clients: false });
+    expect(none.accounts).toEqual([]);
+    expect(none.accountsTotal).toBe("0.00");
+    expect(none.expenses).toEqual([]);
+    expect(none.topDues).toEqual([]);
+    expect(redactDashboard(d, { accounts: true, expense: true, clients: true })).toEqual(d);
   });
 });

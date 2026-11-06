@@ -2,7 +2,18 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Button, Card, Col, Dropdown, Flex, Input, Row, Segmented, Tooltip, Typography } from "antd";
+import {
+  Button,
+  Card,
+  Col,
+  Dropdown,
+  Flex,
+  Input,
+  Row,
+  Segmented,
+  Tooltip,
+  Typography,
+} from "antd";
 import type { TableColumnsType } from "antd";
 import { EllipsisOutlined, PlusOutlined } from "@ant-design/icons";
 import { d } from "@/lib/calc/money";
@@ -50,7 +61,7 @@ function SummaryCard({
       </Typography.Text>
       <div
         style={{
-          fontSize: 22,
+          fontSize: "clamp(17px, 4.6vw, 22px)",
           fontWeight: 700,
           fontVariantNumeric: "tabular-nums",
           color,
@@ -128,11 +139,7 @@ export function InvoiceList({
           <Tooltip title={r.passengers.join(", ")}>
             <span>
               {r.passengers[0]}
-              {more > 0 && (
-                <div style={{ fontSize: 12, color: THEME.muted }}>
-                  +{more} more
-                </div>
-              )}
+              {more > 0 && <div style={{ fontSize: 12, color: THEME.muted }}>+{more} more</div>}
             </span>
           </Tooltip>
         );
@@ -226,7 +233,11 @@ export function InvoiceList({
                 ],
               }}
             >
-              <Button size="small" icon={<EllipsisOutlined />} aria-label={`More for ${r.number}`} />
+              <Button
+                size="small"
+                icon={<EllipsisOutlined />}
+                aria-label={`More for ${r.number}`}
+              />
             </Dropdown>
           </Flex>
         );
@@ -296,11 +307,13 @@ export function InvoiceList({
           align="center"
           style={{ padding: "14px 16px", borderBottom: `1px solid ${THEME.line}` }}
         >
-          <Segmented
-            value={status ?? ""}
-            onChange={(v) => setParams({ invoiceStatus: v ? String(v) : null })}
-            options={tabs}
-          />
+          <div style={{ maxWidth: "100%", overflowX: "auto" }}>
+            <Segmented
+              value={status ?? ""}
+              onChange={(v) => setParams({ invoiceStatus: v ? String(v) : null })}
+              options={tabs}
+            />
+          </div>
           <div style={{ flex: 1 }} />
           <DateRangeFilter from={params.from} to={params.to} />
           <Input.Search
@@ -309,7 +322,7 @@ export function InvoiceList({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onSearch={(q) => setParams({ q })}
-            style={{ width: 320 }}
+            style={{ width: 320, maxWidth: "100%" }}
           />
         </Flex>
         <div style={{ padding: "0 4px" }}>

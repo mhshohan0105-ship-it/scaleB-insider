@@ -42,6 +42,8 @@ export interface NavModule {
   /** Build phase (PLAN.md section 11) that delivers this module. */
   phase: number;
   href?: string;
+  /** Sidebar shows one link to this page; the children stay searchable. */
+  hub?: string;
   children?: NavLeaf[];
 }
 
@@ -270,6 +272,7 @@ export const NAV: NavModule[] = [
     icon: "report",
     phase: 5,
     children: [
+      { label: "All Reports", href: "/reports" },
       { label: "Ledgers", href: "/reports/ledgers" },
       { label: "Due & Advance", href: "/reports/due" },
       { label: "Sales", href: "/reports/sales" },
@@ -288,7 +291,9 @@ export const NAV: NavModule[] = [
     label: "Configuration",
     icon: "settings",
     phase: 1,
+    hub: "/settings",
     children: [
+      { label: "All Settings", href: "/settings" },
       { label: "App Config", href: "/settings/app" },
       { label: "Agency Profile", href: "/settings/profile" },
       { label: "Users", href: "/settings/users" },

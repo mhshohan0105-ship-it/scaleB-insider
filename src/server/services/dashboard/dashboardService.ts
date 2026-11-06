@@ -4,6 +4,8 @@ import { Prisma } from "@prisma/client";
 import { dateToIso, fiscalMonths, fiscalYear, isoToDate, monthStart, todayIso } from "@/lib/dates";
 import { checkLedgerIntegrity, isHealthy } from "@/server/accounting/balances";
 import { sqlDate } from "@/server/db/sqlDate";
+import { addMonthsIso } from "@/lib/passport";
+import { invoiceDue } from "../invoices/invoiceCommon";
 import { passportAlerts } from "../passports/passportService";
 import { tenantDb } from "@/server/db/tenant";
 import type { ServiceContext } from "../context";
@@ -32,6 +34,39 @@ export interface Dashboard {
   receivable: string;
   payable: string;
   clientAdvance: string;
+  /** The same figures one period earlier, for the trend on the cards. */
+  previous: {
+    salesYesterday: string;
+    collectionYesterday: string;
+    /** First of last month up to the same day of the month. */
+    salesLastMonth: string;
+    collectionLastMonth: string;
+  };
+  /** The last 30 days, oldest first. */
+  daily: { date: string; sales: string; collection: string }[];
+  topDues: { id: string; name: string; code: string; phone: string | null; balance: string }[];
+  overdue: {
+    count: number;
+    amount: string;
+    list: {
+      id: string;
+      type: string;
+      number: string;
+      clientId: string;
+      clientName: string;
+      dueDate: string;
+      due: string;
+    }[];
+  };
+  recent: {
+    id: string;
+    type: string;
+    number: string;
+    date: string;
+    clientName: string;
+    netTotal: string;
+    status: string;
+  }[];
   chart: { month: string; sales: string; purchase: string; collection: string; profit: string }[];
   flights: {
     id: string;
@@ -155,8 +190,81 @@ export async function getDashboard(
     profit: money(inv.get(m)?.profit),
   }));
 
-  // Flights in the next 7 days.
+  // Comparisons and the 30 day trend.
+  const addDays = (iso: string, n: number) =>
+    dateToIso(new Date(isoToDate(iso).getTime() + n * 86_400_000));
+  const yesterday = addDays(today, -1);
+  const from30 = addDays(today, -29);
+  const lastMonthFrom = monthStart(addMonthsIso(today, -1));
+  const lastMonthTo = addMonthsIso(today, -1);
+  const [invDays, recDays, [invLast], [recLast]] = await Promise.all([
+    db.$queryRaw<{ day: string; amount: Prisma.Decimal }[]>`
+      SELECT DATE_FORMAT(date, '%Y-%m-%d') AS day, SUM(\`netTotal\` - \`refundCredit\`) AS amount
+      FROM \`Invoice\`
+      WHERE \`agencyId\` = ${ctx.agencyId} AND status IN ${LIVE}
+        AND date >= ${d(from30)} AND date <= ${t}
+      GROUP BY day`,
+    db.$queryRaw<{ day: string; amount: Prisma.Decimal }[]>`
+      SELECT DATE_FORMAT(date, '%Y-%m-%d') AS day, SUM(amount) AS amount
+      FROM \`MoneyReceipt\`
+      WHERE \`agencyId\` = ${ctx.agencyId} AND status = 'POSTED'
+        AND date >= ${d(from30)} AND date <= ${t}
+      GROUP BY day`,
+    db.$queryRaw<{ amount: Prisma.Decimal | null }[]>`
+      SELECT SUM(\`netTotal\` - \`refundCredit\`) AS amount
+      FROM \`Invoice\`
+      WHERE \`agencyId\` = ${ctx.agencyId} AND status IN ${LIVE}
+        AND date >= ${d(lastMonthFrom)} AND date <= ${d(lastMonthTo)}`,
+    db.$queryRaw<{ amount: Prisma.Decimal | null }[]>`
+      SELECT SUM(amount) AS amount
+      FROM \`MoneyReceipt\`
+      WHERE \`agencyId\` = ${ctx.agencyId} AND status = 'POSTED'
+        AND date >= ${d(lastMonthFrom)} AND date <= ${d(lastMonthTo)}`,
+  ]);
+  const salesByDay = new Map(invDays.map((r) => [r.day, r.amount]));
+  const receiptsByDay = new Map(recDays.map((r) => [r.day, r.amount]));
+  const daily = Array.from({ length: 30 }, (_, i) => {
+    const date = addDays(from30, i);
+    return {
+      date,
+      sales: money(salesByDay.get(date)),
+      collection: money(receiptsByDay.get(date)),
+    };
+  });
+
+  // Who owes the most, what is past its due date, what was just made.
   const now = isoToDate(today);
+  const overdueWhere: Prisma.InvoiceWhereInput = {
+    status: { in: ["POSTED", "PARTIAL"] },
+    dueDate: { lt: now },
+  };
+  const [topDues, overdueRows, overdueSums, overdueCount, recent] = await Promise.all([
+    db.client.findMany({
+      where: { balance: { gt: 0 } },
+      orderBy: { balance: "desc" },
+      take: 8,
+      select: { id: true, name: true, code: true, phone: true, balance: true },
+    }),
+    db.invoice.findMany({
+      where: overdueWhere,
+      orderBy: { dueDate: "asc" },
+      take: 8,
+      include: { client: { select: { name: true } } },
+    }),
+    db.invoice.aggregate({
+      where: overdueWhere,
+      _sum: { netTotal: true, refundCredit: true, paidAmount: true },
+    }),
+    db.invoice.count({ where: overdueWhere }),
+    db.invoice.findMany({
+      where: { status: { not: "VOID" } },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      include: { client: { select: { name: true } } },
+    }),
+  ]);
+
+  // Flights in the next 7 days.
   const week = new Date(now.getTime() + 7 * 86_400_000);
   // A reissued ticket flies on its reissue's date, so it is listed from there.
   const liveInvoice = { status: { in: [...LIVE_STATUSES].filter((x) => x !== "REFUNDED") } };
@@ -283,6 +391,40 @@ export async function getDashboard(
     receivable: money(receivable),
     payable: money(payable),
     clientAdvance: money(clientAdvance),
+    previous: {
+      salesYesterday: money(salesByDay.get(yesterday)),
+      collectionYesterday: money(receiptsByDay.get(yesterday)),
+      salesLastMonth: money(invLast?.amount),
+      collectionLastMonth: money(recLast?.amount),
+    },
+    daily,
+    topDues: topDues.map((c) => ({ ...c, balance: money(c.balance) })),
+    overdue: {
+      count: overdueCount,
+      amount: money(
+        (overdueSums._sum.netTotal ?? z())
+          .minus(overdueSums._sum.refundCredit ?? z())
+          .minus(overdueSums._sum.paidAmount ?? z()),
+      ),
+      list: overdueRows.map((i) => ({
+        id: i.id,
+        type: i.type as string,
+        number: i.number,
+        clientId: i.clientId,
+        clientName: i.client.name,
+        dueDate: dateToIso(i.dueDate!),
+        due: money(invoiceDue(i)),
+      })),
+    },
+    recent: recent.map((i) => ({
+      id: i.id,
+      type: i.type as string,
+      number: i.number,
+      date: dateToIso(i.date),
+      clientName: i.client.name,
+      netTotal: money(i.netTotal),
+      status: i.status as string,
+    })),
     chart,
     flights: flights.map((f) => ({
       id: f.id,
@@ -301,5 +443,22 @@ export async function getDashboard(
     bestSalesmen: { month: salesMonth, year: salesYear },
     expenses,
     ledgerHealthy,
+  };
+}
+
+/**
+ * Removes what the user's role may not see before the data leaves the server
+ * (hiding it on the page alone would still send it to the browser).
+ */
+export function redactDashboard(
+  data: Dashboard,
+  may: { accounts: boolean; expense: boolean; clients: boolean },
+): Dashboard {
+  return {
+    ...data,
+    accounts: may.accounts ? data.accounts : [],
+    accountsTotal: may.accounts ? data.accountsTotal : "0.00",
+    expenses: may.expense ? data.expenses : [],
+    topDues: may.clients ? data.topDues : [],
   };
 }

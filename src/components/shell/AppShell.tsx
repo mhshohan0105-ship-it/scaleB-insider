@@ -55,17 +55,24 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  // Below the lg breakpoint the sidebar is hidden and slides in over the page.
+  const [narrow, setNarrow] = useState(false);
   const [search, setSearch] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const searchSeq = useRef(0);
-  const searchBox = useRef<HTMLInputElement>(null);
+  const searchBox = useRef<HTMLDivElement>(null);
+
+  // Choosing a page on a phone closes the sliding sidebar.
+  useEffect(() => {
+    if (narrow) setCollapsed(true);
+  }, [pathname, narrow]);
 
   // Ctrl+K (Cmd+K) jumps to the search box from anywhere.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        searchBox.current?.focus();
+        searchBox.current?.querySelector("input")?.focus();
       }
     }
     window.addEventListener("keydown", onKey);
@@ -110,6 +117,7 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
     () =>
       nav.map((m) => {
         const icon = NAV_ICONS[m.icon] ?? FALLBACK_ICON;
+        if (m.hub) return { key: m.hub, icon, label: <Link href={m.hub}>{m.label}</Link> };
         if (!m.children) {
           return { key: m.href!, icon, label: <Link href={m.href!}>{m.label}</Link> };
         }
@@ -222,8 +230,16 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
         collapsed={collapsed}
         trigger={null}
         breakpoint="lg"
-        onBreakpoint={(broken) => setCollapsed(broken)}
-        style={{ position: "sticky", top: 0, height: "100vh" }}
+        collapsedWidth={narrow ? 0 : 80}
+        onBreakpoint={(broken) => {
+          setNarrow(broken);
+          setCollapsed(broken);
+        }}
+        style={
+          narrow
+            ? { position: "fixed", top: 0, left: 0, height: "100vh", zIndex: 30 }
+            : { position: "sticky", top: 0, height: "100vh" }
+        }
       >
         <div className="shell-logo">
           <span className="shell-logo-mark">sB</span>
@@ -239,7 +255,9 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
             theme="dark"
             mode="inline"
             items={menuItems}
-            selectedKeys={active ? [active.href] : []}
+            selectedKeys={
+              active ? [nav.find((m) => m.module === active.module)?.hub ?? active.href] : []
+            }
             openKeys={collapsed ? undefined : openKeys}
             onOpenChange={(keys) => setOpenKeys(keys.slice(-1))}
             aria-label="Main navigation"
@@ -247,7 +265,11 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
         </div>
       </Layout.Sider>
 
-      <Layout>
+      {narrow && !collapsed && (
+        <div className="shell-backdrop" aria-hidden="true" onClick={() => setCollapsed(true)} />
+      )}
+
+      <Layout style={{ minWidth: 0 }}>
         <Layout.Header className="shell-header">
           <Button
             type="text"
@@ -255,27 +277,26 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
             icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
             onClick={() => setCollapsed(!collapsed)}
           />
-          <AutoComplete
-            style={{ width: 420, maxWidth: "42vw" }}
-            options={searchOptions}
-            value={search}
-            onChange={setSearch}
-            onSelect={(href: string) => {
-              setSearch("");
-              router.push(href);
-            }}
-          >
-            <Input
-              ref={(el) => {
-                searchBox.current = el?.input ?? null;
+          <div ref={searchBox} className="shell-search">
+            <AutoComplete
+              style={{ width: "100%" }}
+              options={searchOptions}
+              value={search}
+              onChange={setSearch}
+              onSelect={(href: string) => {
+                setSearch("");
+                router.push(href);
               }}
-              prefix={<SearchOutlined style={{ color: THEME.muted }} />}
-              suffix={<span className="shell-kbd">Ctrl K</span>}
-              placeholder="Search invoice, ticket, client, passport…"
-              allowClear
-              aria-label="Search"
-            />
-          </AutoComplete>
+            >
+              <Input
+                prefix={<SearchOutlined style={{ color: THEME.muted }} />}
+                suffix={<span className="shell-kbd shell-wide-only">Ctrl K</span>}
+                placeholder="Search invoice, ticket, client, passport…"
+                allowClear
+                aria-label="Search"
+              />
+            </AutoComplete>
+          </div>
 
           <div className="shell-header-spacer" />
           {createMenu && createMenu.length > 0 && (
@@ -285,7 +306,9 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
               </Button>
             </Dropdown>
           )}
-          <LiveClock />
+          <span className="shell-wide-only">
+            <LiveClock />
+          </span>
           <NotificationBell />
           <Dropdown menu={{ items: userMenu }} trigger={["click"]} placement="bottomRight">
             <Button
@@ -295,7 +318,7 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
               <Avatar style={{ background: THEME.brand, fontWeight: 600 }}>
                 {initials(user.name)}
               </Avatar>
-              <span style={{ textAlign: "left", lineHeight: 1.2 }}>
+              <span className="shell-wide-only" style={{ textAlign: "left", lineHeight: 1.2 }}>
                 <div>{user.name}</div>
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                   {user.roleName} · {user.agencyName}

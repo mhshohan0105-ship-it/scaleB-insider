@@ -2,13 +2,14 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Button, Card, Col, Empty, Row, Space, Statistic, Table, Typography } from "antd";
+import { Button, Card, Col, Empty, Row, Space, Table, Typography } from "antd";
 import type { TableColumnsType } from "antd";
 import { FileExcelOutlined, FilePdfOutlined } from "@ant-design/icons";
 import { formatMoney } from "@/lib/format";
 import { cellText, isNumericColumn } from "@/lib/reports/format";
 import type { ReportResult, ReportRow } from "@/lib/reports/types";
 import { PageHeader } from "@/components/PageHeader";
+import { THEME } from "@/components/Providers";
 import { useUrlParams } from "@/components/useUrlParams";
 
 interface Props {
@@ -23,9 +24,9 @@ interface Props {
 }
 
 const ROW_STYLE: Record<string, React.CSSProperties> = {
-  section: { background: "#f5f7f7", fontWeight: 600 },
+  section: { background: "#f3f6f5", fontWeight: 600 },
   subtotal: { fontWeight: 600 },
-  total: { fontWeight: 700, background: "#eef6f4" },
+  total: { fontWeight: 700, background: THEME.brandSoft },
 };
 
 /** Filters + summary + table + totals + PDF / Excel export for any report. */
@@ -88,30 +89,37 @@ export function ReportShell({
       />
       {filters && <Card style={{ marginBottom: 16 }}>{filters}</Card>}
       {report.summary && report.summary.length > 0 && (
-        <Card style={{ marginBottom: 16 }}>
-          <Row gutter={[24, 16]}>
-            {report.summary.map((s) => (
-              <Col
-                key={s.label}
-                xs={12}
-                md={8}
-                lg={Math.max(4, Math.floor(24 / report.summary!.length))}
-              >
-                <Statistic
-                  title={s.label}
-                  value={/^-?\d+(\.\d+)?$/.test(s.value) ? formatMoney(s.value) : s.value}
-                  valueStyle={
-                    s.tone === "bad"
-                      ? { color: "#cf1322" }
-                      : s.tone === "good"
-                        ? { color: "#0e7c6b" }
-                        : undefined
-                  }
-                />
-              </Col>
-            ))}
-          </Row>
-        </Card>
+        <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+          {report.summary.map((s) => (
+            <Col
+              key={s.label}
+              xs={12}
+              md={8}
+              lg={Math.max(4, Math.floor(24 / report.summary!.length))}
+            >
+              <Card size="small" style={{ height: "100%" }}>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                  {s.label}
+                </Typography.Text>
+                <div
+                  style={{
+                    fontSize: 20,
+                    fontWeight: 700,
+                    fontVariantNumeric: "tabular-nums",
+                    color:
+                      s.tone === "bad"
+                        ? THEME.danger
+                        : s.tone === "good"
+                          ? THEME.success
+                          : undefined,
+                  }}
+                >
+                  {/^-?\d+(\.\d+)?$/.test(s.value) ? formatMoney(s.value) : s.value}
+                </div>
+              </Card>
+            </Col>
+          ))}
+        </Row>
       )}
       <Card>
         <Table<ReportRow>
@@ -121,6 +129,7 @@ export function ReportShell({
           dataSource={report.rows}
           loading={pending}
           scroll={{ x: "max-content" }}
+          sticky={{ offsetHeader: 64 }}
           locale={{
             emptyText: <Empty description={report.notes?.[0] ?? "No records for these filters"} />,
           }}
@@ -145,7 +154,7 @@ export function ReportShell({
             report.totals
               ? () => (
                   <Table.Summary fixed>
-                    <Table.Summary.Row style={{ fontWeight: 700, background: "#eef6f4" }}>
+                    <Table.Summary.Row style={{ fontWeight: 700, background: THEME.brandSoft }}>
                       {report.columns.map((c, i) => (
                         <Table.Summary.Cell
                           key={c.key}

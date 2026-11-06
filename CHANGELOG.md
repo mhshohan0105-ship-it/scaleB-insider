@@ -327,3 +327,14 @@ Verified: `npm run check` green (218 unit + 133 integration), Playwright 28/28.
 - Playwright refund test steps through the wizard.
 
 Verified: `npm run check` green (218 unit + 133 integration), Playwright 28/28.
+
+## Dashboard, Reports home, Settings home and phone layout (2026-11-06)
+
+- **Dashboard:** quick-create buttons by role; today's sales and collection against yesterday; receivable with what is past its due date; cash and bank; a 30 day sales and collection chart; "At a glance" for month and year, with sales against the same days of last month; who owes the most, with Receive; invoices past their due date; recent invoices. Data a role may not see (accounts, expenses, top dues) is removed on the server by `redactDashboard`, not just hidden. `src/lib/calc/trend.ts` is pure and unit tested.
+- **Reports:** a new home page (`/reports`, first entry of the Reports menu) lists every report the role may run, by section, with one line on what it shows and a search (`src/lib/reports/directory.ts`). Report pages show the summary as cards, keep the table header on screen while scrolling, and the date filter offers this and last fiscal year using the agency's own fiscal year.
+- **Configuration:** a new Settings home page (`/settings`) with all pages in sections, a count on each list and a search (`src/lib/settingsHub.ts`). The sidebar shows one Configuration link; its pages stay in the global search. The lists themselves already shared one engine, so they are unchanged.
+- **Phones:** below the lg breakpoint the sidebar is hidden and slides in over a dimmed page from the menu button, closing when a page is chosen; the top bar drops the clock, the name and the shortcut hint. Dashboard, forms, lists, refund, settings and report pages were measured at 375 px with no sideways page scroll.
+
+Verified: `npm run check` green (224 unit + 136 integration), Playwright 28/28 (run on port 3137, since another project was using 3100).
+
+Known: a dev-only React 19 warning about `element.ref` comes from antd's AutoComplete in the search box; it does not appear in production builds. The agency logo on the login page is left for the SaaS step: the agency is not known until its code is entered.

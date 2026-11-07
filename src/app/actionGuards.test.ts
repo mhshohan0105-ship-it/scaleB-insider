@@ -17,7 +17,13 @@ const GUARDS = [
 ];
 
 /** Actions that are public on purpose. */
-const PUBLIC = new Set(["(auth)/login/actions.ts#loginAction", "(app)/actions.ts#logoutAction"]);
+const PUBLIC = new Set([
+  "(auth)/login/actions.ts#loginAction",
+  "(app)/actions.ts#logoutAction",
+  // Self sign-up: limited by mobile number and network address in signupService.
+  "(public)/signup/actions.ts#requestSignupCodeAction",
+  "(public)/signup/actions.ts#signUpAction",
+]);
 
 function serverActionFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {

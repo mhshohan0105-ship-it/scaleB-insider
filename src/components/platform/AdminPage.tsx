@@ -33,6 +33,7 @@ import { PLAN_MODULES } from "@/lib/subscription";
 import type { AgencyRow, PlanRow } from "@/server/services/admin/adminService";
 import { MoneyInput } from "@/components/MoneyInput";
 import { PageHeader } from "@/components/PageHeader";
+import { AgencyPaymentsModal } from "./AgencyPaymentsModal";
 import { applyActionResult } from "@/components/formResult";
 import {
   createAgencyAction,
@@ -97,6 +98,7 @@ export function AdminPage({ agencies, plans }: Props) {
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm<NewAgency>();
   const [subFor, setSubFor] = useState<AgencyRow | null>(null);
+  const [payFor, setPayFor] = useState<AgencyRow | null>(null);
   const [subForm] = Form.useForm<SubscriptionForm>();
   const subStatus = Form.useWatch("status", subForm);
   const [planFor, setPlanFor] = useState<PlanRow | "new" | null>(null);
@@ -258,6 +260,11 @@ export function AdminPage({ agencies, plans }: Props) {
           {a.status !== "SUSPENDED" && (
             <Button size="small" onClick={() => setSubFor(a)}>
               Subscription
+            </Button>
+          )}
+          {a.status !== "SUSPENDED" && !a.isOwn && (
+            <Button size="small" onClick={() => setPayFor(a)}>
+              Payments
             </Button>
           )}
           {!a.isOwn && a.status !== "SUSPENDED" && (
@@ -448,6 +455,15 @@ export function AdminPage({ agencies, plans }: Props) {
           </Form.Item>
         </Form>
       </Modal>
+
+      {payFor && (
+        <AgencyPaymentsModal
+          agency={payFor}
+          plans={plans}
+          onClose={() => setPayFor(null)}
+          onChanged={() => router.refresh()}
+        />
+      )}
 
       {subFor && (
         <Modal

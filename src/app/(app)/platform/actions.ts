@@ -21,6 +21,11 @@ import {
   saveGoogleClient,
 } from "@/server/services/backup/platformBackup";
 import { replyFeedback, sendFeedback } from "@/server/services/feedback/feedbackService";
+import {
+  adminSubscriptionPayments,
+  recordSubscriptionPayment,
+  voidSubscriptionPayment,
+} from "@/server/services/subscription/paymentService";
 import { sendManualSms, sendPassportReminders } from "@/server/services/sms/smsService";
 
 export async function sendSmsAction(values: unknown) {
@@ -87,4 +92,16 @@ export async function saveGoogleClientAction(values: unknown) {
 
 export async function disconnectGoogleAction() {
   return runAction(async () => disconnectGoogle(await actor()));
+}
+
+export async function agencyPaymentsAction(agencyId: string) {
+  return runAction(async () => adminSubscriptionPayments(await actor(), agencyId));
+}
+
+export async function recordSubscriptionPaymentAction(agencyId: string, values: unknown) {
+  return runAction(async () => recordSubscriptionPayment(await actor(), agencyId, values));
+}
+
+export async function voidSubscriptionPaymentAction(id: string, values: unknown) {
+  return runAction(async () => voidSubscriptionPayment(await actor(), id, values));
 }

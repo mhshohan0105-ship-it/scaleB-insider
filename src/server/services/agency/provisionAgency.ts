@@ -109,7 +109,18 @@ export async function ensureRolesAndSettings(tx: Tx, agencyId: string) {
   return roleIds;
 }
 
-export async function provisionAgency(input: ProvisionInput, client: PrismaClient = prisma) {
+/** A self sign-up starts as a trial on a plan, remembering the verified mobile. */
+export interface TrialStart {
+  plan: string;
+  trialEndsAt: Date;
+  signupPhone: string;
+}
+
+export async function provisionAgency(
+  input: ProvisionInput,
+  client: PrismaClient = prisma,
+  trial?: TrialStart,
+) {
   const data = provisionSchema.parse(input);
   const passwordHash = await bcrypt.hash(data.owner.password, 10);
 
@@ -122,6 +133,7 @@ export async function provisionAgency(input: ProvisionInput, client: PrismaClien
           phone: data.phone,
           email: data.email,
           address: data.address,
+          ...(trial ? { status: "TRIAL" as const, ...trial } : {}),
         },
       });
       const roleIds = await ensureRolesAndSettings(tx, agency.id);

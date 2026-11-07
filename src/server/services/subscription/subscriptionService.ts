@@ -86,35 +86,50 @@ export async function assertUserFits(tx: TenantTx, agencyId: string) {
     );
 }
 
+/** Offered plans for the public home page. */
+export async function publicPlans() {
+  const plans = await prisma.plan.findMany({
+    where: { isActive: true },
+    orderBy: [{ sortOrder: "asc" }],
+  });
+  return plans.map((p) => {
+    const plan = {
+      code: p.code,
+      name: p.name,
+      maxUsers: p.maxUsers,
+      modules: parsePlanModules(p.modules),
+      priceMonthly: p.priceMonthly.toFixed(2),
+      priceYearly: p.priceYearly.toFixed(2),
+    };
+    return { ...plan, priceLine: priceLine(plan) };
+  });
+}
+
+export type PublicPlan = Awaited<ReturnType<typeof publicPlans>>[number];
+
+/** Whoever runs this installation: the first agency with a platform administrator. */
+export function platformAgency() {
+  return prisma.agency.findFirst({
+    where: { users: { some: { isSuperAdmin: true, isActive: true } } },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true, phone: true, email: true },
+  });
+}
+
 /** What the agency sees on its Subscription page. */
 export async function subscriptionPage(agencyId: string) {
   const agency = await prisma.agency.findUniqueOrThrow({ where: { id: agencyId } });
   const [sub, activeUsers, plans, platform] = await Promise.all([
     subscriptionOf(agency),
     tenantDb(agencyId).user.count({ where: { isActive: true } }),
-    prisma.plan.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: "asc" }] }),
-    // Whoever runs this installation: the first agency with a platform administrator.
-    prisma.agency.findFirst({
-      where: { users: { some: { isSuperAdmin: true, isActive: true } } },
-      orderBy: { createdAt: "asc" },
-      select: { name: true, phone: true, email: true },
-    }),
+    publicPlans(),
+    platformAgency(),
   ]);
   return {
     ...sub,
     activeUsers,
     priceLine: priceLine(sub.plan),
-    plans: plans.map((p) => {
-      const plan = {
-        code: p.code,
-        name: p.name,
-        maxUsers: p.maxUsers,
-        modules: parsePlanModules(p.modules),
-        priceMonthly: p.priceMonthly.toFixed(2),
-        priceYearly: p.priceYearly.toFixed(2),
-      };
-      return { ...plan, priceLine: priceLine(plan) };
-    }),
+    plans,
     contact: platform,
   };
 }

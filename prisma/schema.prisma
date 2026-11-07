@@ -44,80 +44,83 @@ model Agency {
   trialEndsAt     DateTime?
   /// ACTIVE: paid up to here (a short grace period follows). Null: no end.
   paidUntil       DateTime?
+  /// Mobile number used to sign up for a trial (one trial per number).
+  signupPhone     String?      @db.VarChar(20)
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
-  setting            AgencySetting?
-  images             AgencyImage[]
-  users              User[]
-  roles              Role[]
-  loginHistory       LoginHistory[]
-  notifications      Notification[]
-  feedback           Feedback[]
-  auditLogs          AuditLog[]
-  clientCategories   ClientCategory[]
-  countries          Country[]
-  airports           Airport[]
-  airlines           Airline[]
-  products           Product[]
-  visaTypes          VisaType[]
-  departments        Department[]
-  designations       Designation[]
-  employees          Employee[]
-  roomTypes          RoomType[]
-  transportTypes     TransportType[]
-  passportStatuses   PassportStatus[]
-  groups             Group[]
-  maharams           Maharam[]
-  companies          Company[]
-  cities             City[]
-  places             Place[]
-  tourGroups         TourGroup[]
-  tourTickets        TourTicket[]
-  guides             Guide[]
-  transports         Transport[]
-  foods              Food[]
-  accommodations     Accommodation[]
-  otherTransports    OtherTransport[]
-  clients            Client[]
-  combinedClients    CombinedClient[]
-  vendors            Vendor[]
-  agents             Agent[]
-  documentSequences  DocumentSequence[]
-  ledgerAccounts     LedgerAccount[]
-  moneyAccounts      MoneyAccount[]
-  journalEntries     JournalEntry[]
-  journalLines       JournalLine[]
-  accountingPeriods  AccountingPeriod[]
-  balanceTransfers   BalanceTransfer[]
-  invoices           Invoice[]
-  airTickets         InvoiceAirTicket[]
-  moneyReceipts      MoneyReceipt[]
-  receiptAllocations MoneyReceiptAllocation[]
-  vendorPayments     VendorPayment[]
-  advanceReturns     AdvanceReturn[]
-  invoiceItems       InvoiceItem[]
-  visaLines          InvoiceVisaLine[]
-  reissueLines       InvoiceReissueLine[]
-  pilgrims           Pilgrim[]
-  pilgrimEvents      PilgrimEvent[]
-  hajjTransfers      HajjTransfer[]
-  hajjTransferLines  HajjTransferLine[]
-  expenseHeads       ExpenseHead[]
-  vouchers           Voucher[]
-  attachments        Attachment[]
-  loanAuthorities    LoanAuthority[]
-  loans              Loan[]
-  loanPayments       LoanPayment[]
-  payrolls           Payroll[]
-  cheques            Cheque[]
-  passports          Passport[]
-  quotations         Quotation[]
-  quotationLines     QuotationLine[]
-  smsLogs            SmsLog[]
-  refunds            Refund[]
-  refundLines        RefundLine[]
-  voucherAllocations VoucherAllocation[]
+  setting              AgencySetting?
+  images               AgencyImage[]
+  subscriptionPayments SubscriptionPayment[]
+  users                User[]
+  roles                Role[]
+  loginHistory         LoginHistory[]
+  notifications        Notification[]
+  feedback             Feedback[]
+  auditLogs            AuditLog[]
+  clientCategories     ClientCategory[]
+  countries            Country[]
+  airports             Airport[]
+  airlines             Airline[]
+  products             Product[]
+  visaTypes            VisaType[]
+  departments          Department[]
+  designations         Designation[]
+  employees            Employee[]
+  roomTypes            RoomType[]
+  transportTypes       TransportType[]
+  passportStatuses     PassportStatus[]
+  groups               Group[]
+  maharams             Maharam[]
+  companies            Company[]
+  cities               City[]
+  places               Place[]
+  tourGroups           TourGroup[]
+  tourTickets          TourTicket[]
+  guides               Guide[]
+  transports           Transport[]
+  foods                Food[]
+  accommodations       Accommodation[]
+  otherTransports      OtherTransport[]
+  clients              Client[]
+  combinedClients      CombinedClient[]
+  vendors              Vendor[]
+  agents               Agent[]
+  documentSequences    DocumentSequence[]
+  ledgerAccounts       LedgerAccount[]
+  moneyAccounts        MoneyAccount[]
+  journalEntries       JournalEntry[]
+  journalLines         JournalLine[]
+  accountingPeriods    AccountingPeriod[]
+  balanceTransfers     BalanceTransfer[]
+  invoices             Invoice[]
+  airTickets           InvoiceAirTicket[]
+  moneyReceipts        MoneyReceipt[]
+  receiptAllocations   MoneyReceiptAllocation[]
+  vendorPayments       VendorPayment[]
+  advanceReturns       AdvanceReturn[]
+  invoiceItems         InvoiceItem[]
+  visaLines            InvoiceVisaLine[]
+  reissueLines         InvoiceReissueLine[]
+  pilgrims             Pilgrim[]
+  pilgrimEvents        PilgrimEvent[]
+  hajjTransfers        HajjTransfer[]
+  hajjTransferLines    HajjTransferLine[]
+  expenseHeads         ExpenseHead[]
+  vouchers             Voucher[]
+  attachments          Attachment[]
+  loanAuthorities      LoanAuthority[]
+  loans                Loan[]
+  loanPayments         LoanPayment[]
+  payrolls             Payroll[]
+  cheques              Cheque[]
+  passports            Passport[]
+  quotations           Quotation[]
+  quotationLines       QuotationLine[]
+  smsLogs              SmsLog[]
+  refunds              Refund[]
+  refundLines          RefundLine[]
+  voucherAllocations   VoucherAllocation[]
 }
 
 enum AitBase {
@@ -2319,4 +2322,45 @@ model Plan {
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+/// Self sign-up (Step 9): a code sent to the mobile number must come back
+/// before the trial agency is created. Platform level, no agency yet.
+model SignupRequest {
+  id        String    @id @default(cuid())
+  phone     String    @db.VarChar(20)
+  codeHash  String    @db.VarChar(64)
+  attempts  Int       @default(0)
+  ip        String?   @db.VarChar(64)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([phone, createdAt])
+  @@index([ip, createdAt])
+}
+
+/// Money an agency paid for its plan, recorded by the platform admin. Each
+/// payment moves the agency's paidUntil on; voided, never deleted.
+model SubscriptionPayment {
+  id          String   @id @default(cuid())
+  agencyId    String
+  number      String   @unique @db.VarChar(20) // SUB-2026-00001
+  date        DateTime @db.Date
+  amount      Decimal  @db.Decimal(14, 2)
+  method      String   @db.VarChar(10) // CASH | BANK | MOBILE | CARD
+  reference   String?  @db.VarChar(80)
+  plan        String   @db.VarChar(40)
+  months      Int
+  periodFrom  DateTime @db.Date
+  periodTo    DateTime @db.Date
+  note        String?  @db.Text
+  status      String   @default("POSTED") @db.VarChar(10) // POSTED | VOID
+  voidReason  String?  @db.Text
+  createdById String
+  createdAt   DateTime @default(now())
+
+  agency Agency @relation(fields: [agencyId], references: [id])
+
+  @@index([agencyId, date])
 }

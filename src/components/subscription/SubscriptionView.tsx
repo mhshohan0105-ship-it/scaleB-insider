@@ -1,10 +1,11 @@
 "use client";
 
-import { Card, Col, Descriptions, Row, Tag, Typography } from "antd";
-import { formatDate } from "@/lib/format";
+import { Card, Col, Descriptions, Row, Table, Tag, Typography } from "antd";
+import { formatDate, formatMoney } from "@/lib/format";
 import { NAV } from "@/lib/nav";
 import { PLAN_MODULES } from "@/lib/subscription";
 import type { SubscriptionPageData } from "@/server/services/subscription/subscriptionService";
+import type { SubscriptionPaymentRow } from "@/server/services/subscription/paymentService";
 import { PageHeader } from "@/components/PageHeader";
 
 const MODULE_LABEL = Object.fromEntries(NAV.map((m) => [m.module, m.label]));
@@ -18,7 +19,13 @@ function stageTag(d: SubscriptionPageData) {
 }
 
 /** The agency's own view of its plan: what it includes, until when, and the other plans. */
-export function SubscriptionView({ data }: { data: SubscriptionPageData }) {
+export function SubscriptionView({
+  data,
+  payments,
+}: {
+  data: SubscriptionPageData;
+  payments: SubscriptionPaymentRow[];
+}) {
   const { plan, contact } = data;
   const included = plan.modules.length ? plan.modules : PLAN_MODULES;
   const period = data.status.trial
@@ -93,6 +100,45 @@ export function SubscriptionView({ data }: { data: SubscriptionPageData }) {
             )}
           </Card>
         </Col>
+        {payments.length > 0 && (
+          <Col span={24}>
+            <Card title="Payments">
+              <Table<SubscriptionPaymentRow>
+                rowKey="id"
+                size="small"
+                dataSource={payments}
+                pagination={false}
+                scroll={{ x: "max-content" }}
+                columns={[
+                  {
+                    title: "Receipt",
+                    dataIndex: "number",
+                    render: (v: string, p) => (
+                      <>
+                        <a href={`/api/pdf/subscription/${p.id}`} target="_blank" rel="noreferrer">
+                          {v}
+                        </a>{" "}
+                        {p.status === "VOID" && <Tag color="red">Void</Tag>}
+                      </>
+                    ),
+                  },
+                  { title: "Date", dataIndex: "date", render: (v: string) => formatDate(v) },
+                  {
+                    title: "Amount (BDT)",
+                    dataIndex: "amount",
+                    align: "right",
+                    render: (v: string) => formatMoney(v),
+                  },
+                  {
+                    title: "Covers",
+                    key: "c",
+                    render: (_, p) => `${formatDate(p.periodFrom)} to ${formatDate(p.periodTo)}`,
+                  },
+                ]}
+              />
+            </Card>
+          </Col>
+        )}
         {data.plans.length > 1 && (
           <Col span={24}>
             <Card title="Plans">

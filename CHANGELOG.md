@@ -370,3 +370,15 @@ Verified: `npm run check` green (226 unit + 139 integration), Playwright 28/28 o
 Verified: `npm run check` green (235 unit + 145 integration), Playwright 28/28 on port 3137; in the browser an agency put on an ended trial shows the strip, loses "+ New" and Add buttons, and a plan cut to two modules hides the rest from the sidebar and blocks their pages.
 
 Next in Step 9: sign-up with a 14 day trial, recording payments, a public landing page with Terms and Privacy, the agency logo on the sign-in page, and alerts.
+
+## Step 9, parts 2 to 6: sign-up, payments, public site, sign-in logo, alerts (2026-11-07)
+
+- **Self sign-up** (`/signup`): agency name and code, owner, mobile, email, username and password. With a real SMS gateway (`SMS_URL_TEMPLATE`) the mobile is proved with a 6 digit code (10 minutes, 5 tries); without one no code is asked. One trial per mobile number, 3 codes per number an hour, 10 codes and 3 sign-ups per network address a day, a hidden field against bots, Terms must be accepted. The agency starts as a 14 day trial (to the end of the 14th Dhaka day) on the Standard plan, the owner is signed in, and the platform admin is notified. Migration `20261107180000_saas` adds `SignupRequest`, `SubscriptionPayment` and `Agency.signupPhone`.
+- **Subscription payments** (Admin > Agencies > Payments): date, plan, months, amount, method, reference. A payment continues an unexpired paid period or starts on its date, moves the agency to that plan and to Paying, and notifies the agency. Payments are voided with a reason, never deleted; the period falls back to the remaining payments. Receipts `SUB-YYYY-NNNNN` as PDF (`/api/pdf/subscription/[id]`), issued by the platform agency; the agency sees its payments and receipts on Settings > Subscription. This is the platform's income and is not posted in the agency's books.
+- **Public site:** a home page at `/` for visitors (signed-in users still go to the dashboard) with features, the offered plans and questions; `/terms` and `/privacy` (drafts, to be checked by a lawyer).
+- **Sign-in page** shows the agency's logo and name once its code is typed (`/api/public/agency`, nothing for unknown or suspended codes) and links to sign-up.
+- **Alerts:** backup failures, and now also "no successful backup in the last day", reach every platform admin in the app and by SMS to the platform phone when a gateway is set up. The daily job reminds agencies 7, 3 and 1 days before their trial or paid period ends and the day after it ends, and sends the platform admin one list.
+
+Verified: `npm run check` green (240 unit + 151 integration), Playwright 29/30 in the full parallel run (the sign-out step of the owner login test timed out once; the login file passes 5/5 on its own) including a new sign-up test; in the browser a sign-up opened a trial and signed in, the sign-in page showed the agency, and a payment renewed the plan and produced its receipt.
+
+Not built: online card or bKash merchant payments, and site-down monitoring, which needs an outside service (e.g. a free uptime monitor).

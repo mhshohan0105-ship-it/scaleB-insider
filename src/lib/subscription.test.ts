@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { parsePlanModules, planPermissions, subscriptionStatus, userFits } from "./subscription";
+import {
+  parsePlanModules,
+  paymentPeriod,
+  planPermissions,
+  subscriptionStatus,
+  userFits,
+} from "./subscription";
 
 const at = (iso: string) => new Date(iso);
 const now = at("2026-11-07T10:00:00Z");
@@ -78,5 +84,26 @@ describe("parsePlanModules and userFits", () => {
     expect(userFits(3, 2)).toBe(true);
     expect(userFits(3, 3)).toBe(false);
     expect(userFits(0, 500)).toBe(true);
+  });
+});
+
+describe("paymentPeriod", () => {
+  it("starts on the payment date when nothing is paid ahead", () => {
+    expect(paymentPeriod(null, "2026-11-07", 1)).toEqual({ from: "2026-11-07", to: "2026-12-06" });
+    expect(paymentPeriod("2026-10-31", "2026-11-07", 12)).toEqual({
+      from: "2026-11-07",
+      to: "2027-11-06",
+    });
+  });
+
+  it("continues a paid period that has not ended", () => {
+    expect(paymentPeriod("2026-11-30", "2026-11-07", 1)).toEqual({
+      from: "2026-12-01",
+      to: "2026-12-31",
+    });
+    expect(paymentPeriod("2027-01-30", "2027-01-10", 1)).toEqual({
+      from: "2027-01-31",
+      to: "2027-02-27",
+    });
   });
 });

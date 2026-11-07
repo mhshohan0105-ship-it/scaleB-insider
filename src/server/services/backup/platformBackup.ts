@@ -24,7 +24,7 @@ import { dumpDatabase } from "@/server/backup/sqlDump";
 import { prisma } from "@/server/db/prisma";
 import { assertSuperAdmin, type AdminActor } from "../admin/adminService";
 import { NotFoundError, ServiceError } from "../errors";
-import { notify } from "../notifications/notificationService";
+import { alertPlatform } from "../alerts/platformAlerts";
 
 const CONFIG_ID = "default";
 /** A run still marked RUNNING after this long is treated as dead. */
@@ -35,7 +35,10 @@ export function backupDir(): string {
 }
 
 function appUrl(): string {
-  return (process.env.APP_URL || process.env.AUTH_URL || "http://localhost:3000").replace(/\/$/, "");
+  return (process.env.APP_URL || process.env.AUTH_URL || "http://localhost:3000").replace(
+    /\/$/,
+    "",
+  );
 }
 
 export function googleRedirectUri(): string {
@@ -72,21 +75,9 @@ const dhakaClock = new Intl.DateTimeFormat("en-GB", {
   hourCycle: "h23",
 });
 
-/** Tells every platform administrator (in their own agency) that a backup went wrong. */
+/** Tells the platform administrators (and texts the platform phone) that a backup went wrong. */
 async function alertAdmins(title: string, body: string) {
-  const admins = await prisma.user.findMany({
-    where: { isSuperAdmin: true, isActive: true },
-    select: { agencyId: true },
-    distinct: ["agencyId"],
-  });
-  for (const a of admins)
-    await notify(a.agencyId, {
-      module: "configuration",
-      kind: "BACKUP_FAILED",
-      title,
-      body,
-      link: "/admin/backups",
-    });
+  await alertPlatform({ kind: "BACKUP_FAILED", title, body, link: "/admin/backups", sms: true });
 }
 
 async function pruneLocal(dir: string, today: string) {
@@ -108,14 +99,22 @@ async function pushToDrive(
   );
   const folderId = await drive.ensureFolder(token, cfg.driveFolderId);
   if (folderId !== cfg.driveFolderId)
-    await prisma.backupConfig.update({ where: { id: CONFIG_ID }, data: { driveFolderId: folderId } });
+    await prisma.backupConfig.update({
+      where: { id: CONFIG_ID },
+      data: { driveFolderId: folderId },
+    });
   const fileId = await drive.uploadFile(token, folderId, name, data);
 
   const remote = await drive.listFiles(token, folderId);
   const parsed = remote
     .map((f) => ({ id: f.id, file: parseBackupName(f.name) }))
     .filter((f): f is { id: string; file: BackupFile } => f.file !== null);
-  const drop = new Set(backupsToDelete(parsed.map((p) => p.file), today));
+  const drop = new Set(
+    backupsToDelete(
+      parsed.map((p) => p.file),
+      today,
+    ),
+  );
   for (const p of parsed) if (drop.has(p.file.name)) await drive.deleteFile(token, p.id);
   return fileId;
 }

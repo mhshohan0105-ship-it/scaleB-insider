@@ -3,6 +3,8 @@
 //    once every 30 days)
 //  - on Mondays, an in-app notice of passports expiring within 30 days
 //  - old read notifications are removed
+//  - an alert when no nightly backup succeeded in the last day
+//  - renewal reminders for trials and paid periods ending soon
 // Call with: Authorization: Bearer <CRON_SECRET>.
 import { NextResponse, type NextRequest } from "next/server";
 import { todayIso } from "@/lib/dates";
@@ -12,6 +14,7 @@ import { prisma } from "@/server/db/prisma";
 import { tenantDb } from "@/server/db/tenant";
 import { notify, pruneNotifications } from "@/server/services/notifications/notificationService";
 import { sendPassportReminders } from "@/server/services/sms/smsService";
+import { checkNightlyBackup, subscriptionReminders } from "@/server/services/alerts/platformAlerts";
 
 // PDFs, exports and nightly jobs can take longer than the platform default.
 export const maxDuration = 60;
@@ -51,5 +54,7 @@ export async function GET(req: NextRequest) {
     results.push(row);
   }
   const pruned = await pruneNotifications();
-  return NextResponse.json({ today, agencies: results, pruned });
+  const backup = await checkNightlyBackup();
+  const renewals = await subscriptionReminders();
+  return NextResponse.json({ today, agencies: results, pruned, backup, renewals });
 }

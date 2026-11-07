@@ -400,3 +400,232 @@ body {
 .inv-aside .ant-form-item-label > label .ant-form-item-optional {
   display: none !important;
 }
+
+/* Public site: home page, sign-up, terms and privacy */
+.pub {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  color: #18211f;
+}
+
+.pub-wrap {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.pub-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid #e3e9e7;
+}
+
+.pub-header .pub-wrap {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pub-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #18211f;
+  font-weight: 650;
+  font-size: 17px;
+}
+
+.pub-logo-mark {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: #0f6b5c;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.pub-nav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pub-hero {
+  color: #e6f4f1;
+  background:
+    radial-gradient(circle at 15% 15%, rgba(255, 255, 255, 0.09), transparent 45%),
+    linear-gradient(150deg, #0c3b34 0%, #0f6b5c 100%);
+  padding: 72px 0 80px;
+}
+
+.pub-hero h1 {
+  max-width: 720px;
+  margin: 0 0 16px;
+  font-size: 44px;
+  line-height: 1.15;
+  font-weight: 650;
+  letter-spacing: -0.6px;
+  color: #ffffff;
+}
+
+.pub-hero p {
+  max-width: 620px;
+  margin: 0 0 28px;
+  font-size: 18px;
+  line-height: 1.6;
+  opacity: 0.9;
+}
+
+.pub-section {
+  padding: 64px 0;
+}
+
+.pub-section.alt {
+  background: #f3f6f5;
+}
+
+.pub-section h2 {
+  margin: 0 0 8px;
+  font-size: 30px;
+  font-weight: 650;
+  letter-spacing: -0.3px;
+}
+
+.pub-lead {
+  margin: 0 0 32px;
+  color: #4a5a56;
+  font-size: 16px;
+}
+
+.pub-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.pub-card {
+  padding: 22px;
+  border: 1px solid #e3e9e7;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.pub-card h3 {
+  margin: 10px 0 6px;
+  font-size: 17px;
+  font-weight: 620;
+}
+
+.pub-card p {
+  margin: 0;
+  color: #4a5a56;
+  line-height: 1.55;
+}
+
+.pub-card .anticon {
+  font-size: 22px;
+  color: #0f6b5c;
+}
+
+.pub-price {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 8px 0 4px;
+}
+
+.pub-footer {
+  margin-top: auto;
+  padding: 28px 0;
+  border-top: 1px solid #e3e9e7;
+  color: #4a5a56;
+  font-size: 14px;
+}
+
+.pub-footer .pub-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  justify-content: space-between;
+}
+
+.pub-footer a {
+  color: #4a5a56;
+  margin-right: 16px;
+}
+
+.pub-doc {
+  max-width: 760px;
+  padding: 48px 20px 64px;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+.pub-doc h1 {
+  font-size: 32px;
+  margin-bottom: 4px;
+}
+
+.pub-doc h2 {
+  font-size: 20px;
+  margin-top: 32px;
+}
+
+.pub-form {
+  max-width: 560px;
+  margin: 40px auto 64px;
+  padding: 0 20px;
+}
+
+@media (max-width: 860px) {
+  .pub-hero {
+    padding: 48px 0 56px;
+  }
+  .pub-hero h1 {
+    font-size: 30px;
+  }
+  .pub-grid {
+    grid-template-columns: 1fr;
+  }
+  .pub-nav .pub-wide {
+    display: none;
+  }
+}
+
+.login-agency {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border: 1px solid #e3e9e7;
+  border-radius: 10px;
+  background: #f3f6f5;
+  font-weight: 600;
+}
+
+.login-agency img {
+  max-width: 96px;
+  max-height: 40px;
+  object-fit: contain;
+}
+
+.login-agency-mark {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #0f6b5c;
+  color: #ffffff;
+}

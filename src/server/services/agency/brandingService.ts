@@ -2,6 +2,7 @@
 // those are the formats the PDF renderer can embed. Stored in the database so
 // backups include them.
 import { recordAudit } from "@/server/audit/audit";
+import { prisma } from "@/server/db/prisma";
 import { tenantDb } from "@/server/db/tenant";
 import type { ServiceContext } from "../context";
 import { ServiceError } from "../errors";
@@ -16,7 +17,13 @@ export function isImageKind(v: string): v is ImageKind {
 
 /** The real format from the file's first bytes (the browser's type is not trusted). */
 export function sniffImage(bytes: Uint8Array): "image/png" | "image/jpeg" | null {
-  if (bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47)
+  if (
+    bytes.length > 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47
+  )
     return "image/png";
   if (bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff)
     return "image/jpeg";
@@ -81,4 +88,22 @@ export async function getAgencyImage(ctx: ServiceContext, kind: ImageKind) {
     where: { kind },
     select: { mimeType: true, data: true, updatedAt: true },
   });
+}
+
+/**
+ * Sign-in page: the agency behind a typed code, so people see they are at the
+ * right place. Only the name and logo are shown, and nothing for suspended or
+ * unknown codes. Looked up by code before any session exists.
+ */
+export async function publicAgencyCard(code: string) {
+  const agency = await prisma.agency.findUnique({
+    where: { code: code.trim().toLowerCase().slice(0, 40) },
+    select: { id: true, name: true, status: true },
+  });
+  if (!agency || agency.status === "SUSPENDED") return null;
+  const logo = await tenantDb(agency.id).agencyImage.findFirst({
+    where: { kind: "LOGO" },
+    select: { mimeType: true, data: true, updatedAt: true },
+  });
+  return { name: agency.name, logo };
 }

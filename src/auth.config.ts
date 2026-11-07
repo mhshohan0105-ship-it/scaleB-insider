@@ -2,7 +2,9 @@
 // No database or Node only imports here.
 import type { NextAuthConfig } from "next-auth";
 
-const PUBLIC_PATHS = ["/login", "/verify/"];
+// Pages anyone may open: sign in and sign up, the invoice check, the public
+// site (home page, terms, privacy) and the sign-in page's agency lookup.
+const PUBLIC_PATHS = ["/login", "/signup", "/verify/", "/terms", "/privacy", "/api/public/"];
 
 export const authConfig = {
   pages: { signIn: "/login" },
@@ -10,9 +12,10 @@ export const authConfig = {
   providers: [],
   callbacks: {
     authorized({ auth, request }) {
-      const isPublic = PUBLIC_PATHS.some((p) => request.nextUrl.pathname.startsWith(p));
+      const path = request.nextUrl.pathname;
+      const isPublic = path === "/" || PUBLIC_PATHS.some((p) => path.startsWith(p));
       if (isPublic) {
-        if (auth?.user && request.nextUrl.pathname === "/login") {
+        if (auth?.user && (path === "/login" || path === "/signup" || path === "/")) {
           return Response.redirect(new URL("/dashboard", request.nextUrl));
         }
         return true;

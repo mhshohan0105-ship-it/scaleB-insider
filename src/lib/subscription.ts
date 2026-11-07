@@ -1,6 +1,7 @@
 // Subscription rules (Step 9): what an agency may use under its plan and
 // whether its trial or paid period has run out. Pure and shared by server
 // and client; the server applies the result to every permission check.
+import { addMonthsIso } from "./passport";
 import { MODULE_KEYS, type ModuleKey, type PermissionMap } from "./permissions";
 
 /** Days after `paidUntil` an agency keeps full use while the renewal is sorted out. */
@@ -104,4 +105,25 @@ export function endOfDhakaDay(iso: string): Date {
 /** True when one more active user still fits the plan (0 = no limit). */
 export function userFits(maxUsers: number, activeUsers: number): boolean {
   return maxUsers === 0 || activeUsers < maxUsers;
+}
+
+const nextDay = (iso: string) => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
+
+/**
+ * The days a payment covers ("YYYY-MM-DD", both included): it continues an
+ * unexpired paid period, otherwise it starts on the payment date.
+ */
+export function paymentPeriod(
+  paidUntil: string | null,
+  paidOn: string,
+  months: number,
+): { from: string; to: string } {
+  const from = paidUntil && paidUntil >= paidOn ? nextDay(paidUntil) : paidOn;
+  const end = new Date(`${addMonthsIso(from, months)}T00:00:00Z`);
+  end.setUTCDate(end.getUTCDate() - 1);
+  return { from, to: end.toISOString().slice(0, 10) };
 }

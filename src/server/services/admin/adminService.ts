@@ -29,7 +29,8 @@ export async function assertSuperAdmin(userId: string) {
   if (!u?.isSuperAdmin || !u.isActive) throw new ForbiddenError("Platform administrators only");
 }
 
-async function audit(
+/** Audit entry for platform level work, written into the agency concerned. */
+export async function audit(
   agencyId: string,
   actor: AdminActor,
   action: string,

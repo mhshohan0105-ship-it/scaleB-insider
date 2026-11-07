@@ -397,3 +397,9 @@ Verified: `npm run check` green (240 unit + 151 integration), Playwright 30/30.
 - **Starting prices** (migration `20261107210000_plan_prices`, only for plans still without a price): Starter BDT 1,500 a month / 15,000 a year, Standard 3,000 / 30,000, Premium 5,500 / 55,000. The admin can change them under Admin > Plans.
 
 Verified: `npm run check` green (240 unit + 151 integration); the sign-up e2e passes on the new page.
+
+## Download the invoice PDF (2026-11-07)
+
+- Every invoice form (air ticket, non commission, visa, reissue, other, packages, tour, Hajj, Umrah) has **Save & download PDF** next to Post and print: the invoice is posted and its PDF is saved as `<invoice number>.pdf`. The invoice page has a **Download PDF** button beside Print / PDF. `/api/pdf/invoice/[id]?download=1` serves the file as an attachment.
+
+Verified: `npm run check` green; the other services e2e test now saves with Save & download PDF and checks both downloads are named after the invoice.

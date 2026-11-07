@@ -61,8 +61,9 @@ async function previousDue(ctx: ServiceContext, invoiceId: string, due: string) 
   return before.greaterThan(0) ? before.toFixed(2) : "0.00";
 }
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const download = new URL(req.url).searchParams.get("download") === "1";
   const user = await getUserContext();
   const ctx = await toServiceContext(user);
   const type = await invoiceTypeOf(ctx, id);
@@ -91,7 +92,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   return new NextResponse(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${invoice.number}.pdf"`,
+      // ?download=1 saves the file instead of opening it in the browser.
+      "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${invoice.number}.pdf"`,
       "Cache-Control": "no-store",
     },
   });

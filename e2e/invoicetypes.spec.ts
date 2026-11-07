@@ -17,10 +17,18 @@ test("other services invoice with a cost line posts and prints", async ({ page }
   await expect(page.getByText("7,000.00").first()).toBeVisible();
   await expect(page.getByText("1,000.00").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Save & post" }).click();
+  // "Save & download PDF" posts the invoice and saves its PDF file.
+  const saved = page.waitForEvent("download", { timeout: 60_000 });
+  await page.getByRole("button", { name: "Save & download PDF" }).click();
   await expect(page).toHaveURL(/\/invoices\/other\/(?!new$)[a-z0-9]+$/, { timeout: 30_000 });
   const invoiceNo = (await page.getByRole("heading", { level: 3 }).textContent())!.trim();
   expect(invoiceNo).toMatch(/^OTH-\d{4}-\d{5}$/);
+  expect((await saved).suggestedFilename()).toBe(`${invoiceNo}.pdf`);
+
+  // The invoice page downloads it too.
+  const again = page.waitForEvent("download");
+  await page.getByRole("link", { name: /Download PDF/ }).click();
+  expect((await again).suggestedFilename()).toBe(`${invoiceNo}.pdf`);
   await expect(page.getByText(`Hotel night E2E ${stamp}`)).toBeVisible();
 
   const pdf = await page.request.get(page.url().replace("/invoices/other/", "/api/pdf/invoice/"));

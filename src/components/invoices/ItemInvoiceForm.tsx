@@ -37,6 +37,7 @@ import {
   ReceivePaymentCard,
   methodForAccount,
   openPrintWindow,
+  type PdfOutput,
   paymentPayload,
   type AccountOption,
   type PaymentFormValues,
@@ -242,8 +243,8 @@ export function ItemInvoiceForm({
     ]);
   }
 
-  function submit(post: boolean, print = false) {
-    const printed = openPrintWindow(print);
+  function submit(post: boolean, output?: PdfOutput) {
+    const printed = openPrintWindow(output);
     form
       .validateFields()
       .then((v) => {

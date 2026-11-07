@@ -20,6 +20,7 @@ import {
   Tag,
   Typography,
 } from "antd";
+import { DownloadOutlined } from "@ant-design/icons";
 import type { Dayjs } from "dayjs";
 import type { InvoiceTotals } from "@/lib/calc/invoiceTotals";
 import { d } from "@/lib/calc/money";
@@ -346,7 +347,7 @@ export function InvoiceActionBar({
   showDraft: boolean;
   pending: boolean;
   primaryLabel: string;
-  onSubmit: (post: boolean, print?: boolean) => void;
+  onSubmit: (post: boolean, output?: PdfOutput) => void;
 }) {
   return (
     <div className="inv-actions">
@@ -362,8 +363,17 @@ export function InvoiceActionBar({
           Save as draft
         </Button>
       )}
-      <Button type="primary" ghost loading={pending} onClick={() => onSubmit(true, true)}>
+      <Button type="primary" ghost loading={pending} onClick={() => onSubmit(true, "print")}>
         Post and print
+      </Button>
+      <Button
+        type="primary"
+        ghost
+        icon={<DownloadOutlined />}
+        loading={pending}
+        onClick={() => onSubmit(true, "download")}
+      >
+        Save & download PDF
       </Button>
       <Button type="primary" loading={pending} onClick={() => onSubmit(true)}>
         {primaryLabel}
@@ -372,15 +382,30 @@ export function InvoiceActionBar({
   );
 }
 
+/** What to do with the invoice PDF once the invoice is saved. */
+export type PdfOutput = "print" | "download";
+
+/** Saves the invoice PDF as a file. */
+export function downloadInvoicePdf(invoiceId: string) {
+  const a = document.createElement("a");
+  a.href = `/api/pdf/invoice/${invoiceId}?download=1`;
+  a.download = "";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 /**
- * Opens the PDF tab straight away (inside the click, so it is not blocked as a
- * pop-up) and returns a function that points it at the saved invoice, or closes it.
+ * For "print", opens the PDF tab straight away (inside the click, so it is not
+ * blocked as a pop-up). Returns `show`, which points it at the saved invoice
+ * (or downloads the file), and `cancel` for when saving failed.
  */
-export function openPrintWindow(print: boolean) {
-  const w = print ? window.open("about:blank", "_blank") : null;
+export function openPrintWindow(output?: PdfOutput) {
+  const w = output === "print" ? window.open("about:blank", "_blank") : null;
   return {
     show: (invoiceId: string) => {
       if (w) w.location.href = `/api/pdf/invoice/${invoiceId}`;
+      if (output === "download") downloadInvoicePdf(invoiceId);
     },
     cancel: () => w?.close(),
   };

@@ -39,6 +39,7 @@ import {
   ReceivePaymentCard,
   methodForAccount,
   openPrintWindow,
+  type PdfOutput,
   paymentPayload,
   type AccountOption,
   type PaymentFormValues,
@@ -265,8 +266,8 @@ export function AirInvoiceForm(props: Props) {
     });
   }
 
-  function submit(post: boolean, preview = false) {
-    const printed = openPrintWindow(preview);
+  function submit(post: boolean, output?: PdfOutput) {
+    const printed = openPrintWindow(output);
     form
       .validateFields()
       .then((v) => {

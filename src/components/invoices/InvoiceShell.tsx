@@ -21,6 +21,7 @@ import {
 import {
   ArrowLeftOutlined,
   DollarOutlined,
+  DownloadOutlined,
   EditOutlined,
   PrinterOutlined,
   RollbackOutlined,
@@ -146,6 +147,14 @@ export function InvoiceShell({
                 target="_blank"
               >
                 Print / PDF
+              </Button>
+            )}
+            {invoice.status !== "DRAFT" && (
+              <Button
+                icon={<DownloadOutlined />}
+                href={`/api/pdf/invoice/${invoice.id}?download=1`}
+              >
+                Download PDF
               </Button>
             )}
             {canReceive && hasDue && (

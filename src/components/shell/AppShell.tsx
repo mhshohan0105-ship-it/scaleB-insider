@@ -245,12 +245,22 @@ export function AppShell({ nav, creatable, user, logoutAction, children }: AppSh
         }
       >
         <div className="shell-logo">
-          <span className="shell-logo-mark">sB</span>
-          {!collapsed && (
-            <span className="shell-logo-text">
-              <span>scaleB Insider</span>
-              <span className="shell-logo-agency">{user.agencyName}</span>
-            </span>
+          {collapsed ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              className="shell-logo-icon"
+              src="/brand/scaleb-insider-icon.svg"
+              alt="ScaleB Insider"
+            />
+          ) : (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                className="shell-logo-full"
+                src="/brand/scaleb-insider-dark.svg"
+                alt="ScaleB Insider"
+              />
+            </>
           )}
         </div>
         <div className="shell-sider-scroll">

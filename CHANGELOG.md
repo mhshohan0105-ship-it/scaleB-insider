@@ -382,3 +382,11 @@ Next in Step 9: sign-up with a 14 day trial, recording payments, a public landin
 Verified: `npm run check` green (240 unit + 151 integration), Playwright 29/30 in the full parallel run (the sign-out step of the owner login test timed out once; the login file passes 5/5 on its own) including a new sign-up test; in the browser a sign-up opened a trial and signed in, the sign-in page showed the agency, and a payment renewed the plan and produced its receipt.
 
 Not built: online card or bKash merchant payments, and site-down monitoring, which needs an outside service (e.g. a free uptime monitor).
+
+## ScaleB Insider logo (2026-11-07)
+
+- New logo chosen by the owner ("flight loop", dark version): the ScaleB wordmark with "insider" in gold under it and a dotted flight path that starts at "insider", runs round "Scale" and ends with a plane landing on the B. The lettering is in outlines (Comfortaa, SIL Open Font License), so it looks the same everywhere. Files in `public/brand/`: logo for dark and light backgrounds (SVG and PNG), one on the dark green background, the square icon (SVG, 512, 192 and Apple touch). `src/app/icon.svg` and `src/app/apple-icon.png` are the browser and phone icons.
+- Used in the sidebar (icon when collapsed), the sign-in page, and the header of the public pages.
+- The "Scale" letters and the B mark are drawn to match the parent ScaleB logo, not taken from its source file; replace them when the original vector file is available.
+
+Verified: `npm run check` green (240 unit + 151 integration), Playwright 30/30.

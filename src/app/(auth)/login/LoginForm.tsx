@@ -41,8 +41,8 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
   return (
     <div className="login-page">
       <section className="login-brand" aria-hidden>
-        <div className="login-brand-mark">sB</div>
-        <h1>scaleB Insider</h1>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="login-logo" src="/brand/scaleb-insider-dark.svg" alt="ScaleB Insider" />
         <p>Tickets, visas, tours, Hajj and Umrah, all posted to one set of books.</p>
       </section>
 

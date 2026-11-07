@@ -51,18 +51,6 @@ body {
   opacity: 0.85;
 }
 
-.login-brand-mark {
-  width: 56px;
-  height: 56px;
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  background: #e6f4f1;
-  color: #0f2a2e;
-  font-weight: 700;
-  font-size: 22px;
-}
-
 .login-panel {
   display: flex;
   align-items: center;
@@ -90,7 +78,7 @@ body {
 
 /* App shell */
 .shell-logo {
-  height: 64px;
+  height: 104px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -102,36 +90,33 @@ body {
   overflow: hidden;
 }
 
-.shell-logo-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.25;
-  min-width: 0;
-}
-
-.shell-logo-agency {
-  font-size: 12px;
-  font-weight: 400;
-  color: #9fbdb6;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.shell-logo-mark {
+.shell-logo-full {
   flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  background: #e6f2ef;
-  color: #0c3b34;
-  font-size: 14px;
-  font-weight: 700;
+  height: 84px;
+  width: auto;
+}
+
+.shell-logo-icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  margin-left: -2px;
+}
+
+
+.login-logo {
+  width: 300px;
+  max-width: 100%;
+  height: auto;
+}
+
+.pub-logo img {
+  height: 44px;
+  width: auto;
 }
 
 .shell-sider-scroll {
-  height: calc(100vh - 64px);
+  height: calc(100vh - 104px);
   overflow-y: auto;
   padding-bottom: 16px;
 }
@@ -440,18 +425,6 @@ body {
   color: #18211f;
   font-weight: 650;
   font-size: 17px;
-}
-
-.pub-logo-mark {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: 9px;
-  background: #0f6b5c;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 700;
 }
 
 .pub-nav {

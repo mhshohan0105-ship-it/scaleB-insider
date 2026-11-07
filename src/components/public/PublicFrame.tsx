@@ -23,9 +23,9 @@ export function PublicFrame({
     <div className="pub">
       <header className="pub-header">
         <div className="pub-wrap">
-          <Link href="/" className="pub-logo">
-            <span className="pub-logo-mark">sB</span>
-            scaleB Insider
+          <Link href="/" className="pub-logo" aria-label="ScaleB Insider home">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/scaleb-insider-light.svg" alt="ScaleB Insider" />
           </Link>
           <nav className="pub-nav">
             <Button type="text" href="/#features" className="pub-wide">

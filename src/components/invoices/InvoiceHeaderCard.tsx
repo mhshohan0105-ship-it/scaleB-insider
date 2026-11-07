@@ -1,11 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Card, Col, DatePicker, Form, Row, Select } from "antd";
+import { Card, Col, DatePicker, Form, Row } from "antd";
 import type { FieldOption } from "@/lib/masters";
 import { MoneyInput } from "@/components/MoneyInput";
 import { PartySelect } from "@/components/PartySelect";
 import { ClientField } from "./ClientField";
+import { EntitySelect } from "@/components/select/EntitySelect";
 
 /** Client, dates, salesperson and agent fields shared by the invoice forms. */
 export function InvoiceHeaderCard({
@@ -42,13 +43,7 @@ export function InvoiceHeaderCard({
         </Col>
         <Col xs={24} md={12} xxl={8}>
           <Form.Item label="Sold by" name="salesmanId">
-            <Select
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              options={employees}
-              placeholder="Employee"
-            />
+            <EntitySelect entity="employees" options={employees} placeholder="Employee" />
           </Form.Item>
         </Col>
         <Col xs={24} md={12} xxl={8}>

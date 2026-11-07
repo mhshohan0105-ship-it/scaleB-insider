@@ -338,3 +338,15 @@ Verified: `npm run check` green (218 unit + 133 integration), Playwright 28/28.
 Verified: `npm run check` green (224 unit + 136 integration), Playwright 28/28 (run on port 3137, since another project was using 3100).
 
 Known: a dev-only React 19 warning about `element.ref` comes from antd's AutoComplete in the search box; it does not appear in production builds. The agency logo on the login page is left for the SaaS step: the agency is not known until its code is entered.
+
+## Add new from any picker, part 1: invoice forms (2026-11-07)
+
+- **One picker with "+ Add new":** `EntitySelect` (`src/components/select/`) picks from any configurable list and ends its dropdown with "Add new ..." (or `Add "<typed text>" as new ...`). The row is created in a pop-up with the same form as the list's own page and is selected at once; the invoice being typed is kept. Codes typed into an airline or airport picker (e.g. `SV`) prefill the IATA code, other text the name. `PartySelect` now wraps it, so every client, vendor and agent picker has it; report filters turn it off.
+- **Clients:** the invoice's Existing client / New client switch is gone. "Add new client" asks for name, mobile, type, email and address; when the mobile number already belongs to a client the pop-up says who, with "Use this client". The client is saved when the pop-up is saved (not with the invoice). The server still accepts `newClient` with an invoice.
+- **Accounts:** the "Into account" picker for money received with an invoice can add a cash, bank, mobile banking or card account (same pop-up as the Accounts page, now `MoneyAccountModal`); the payment method follows the new account's type.
+- **In the invoice forms now:** client, sold by (employees), referred by agent, airline, vendor, visa type, tour group, group, room type, product and receiving account.
+- **Permissions:** "+ Add" shows only to users who may create that list (`PermissionsProvider` / `useCan`); the server checks again. Every add is audited as before.
+
+Verified: `npm run check` green (226 unit + 139 integration; one integration run of five had a single failure that did not repeat), Playwright 28/28 on port 3137, with the air ticket test now adding its client from the picker.
+
+Next: the same picker in refunds, money receipts, quotations, passports, Hajj, vouchers, loans and payroll.

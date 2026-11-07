@@ -6,23 +6,31 @@ import dayjs, { type Dayjs } from "dayjs";
 import type { FieldDef, FieldOption, MasterDef } from "@/lib/masters";
 import type { MasterRow } from "@/server/services/masters/masterService";
 import { MoneyInput } from "@/components/MoneyInput";
+import { EntitySelect } from "@/components/select/EntitySelect";
 import { saveEntityAction } from "@/app/(app)/entityActions";
 
 interface MasterFormProps {
   def: MasterDef;
   open: boolean;
   editing: MasterRow | null;
-  refOptions: Record<string, FieldOption[]>;
+  /** Options for ref fields; a ref field without them searches on the server. */
+  refOptions?: Record<string, FieldOption[]>;
+  /** Starting values for a new row (e.g. the name typed into a picker). */
+  prefill?: Record<string, string>;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (id: string) => void;
 }
 
 type FormValues = Record<string, unknown>;
 
-function initialValues(def: MasterDef, row: MasterRow | null): FormValues {
+function initialValues(
+  def: MasterDef,
+  row: MasterRow | null,
+  prefill?: Record<string, string>,
+): FormValues {
   const values: FormValues = {};
   for (const f of def.fields) {
-    const v = row ? row[f.name] : f.defaultValue;
+    const v = row ? row[f.name] : (prefill?.[f.name] ?? f.defaultValue);
     values[f.name] = f.type === "date" && v ? dayjs(v as string) : (v ?? undefined);
   }
   return values;
@@ -37,7 +45,7 @@ function toPayload(def: MasterDef, values: FormValues): FormValues {
   return out;
 }
 
-function renderInput(f: FieldDef, refOptions: Record<string, FieldOption[]>) {
+function renderInput(f: FieldDef, refOptions?: Record<string, FieldOption[]>) {
   switch (f.type) {
     case "textarea":
       return <Input.TextArea rows={3} maxLength={f.max} showCount={!!f.max && f.max > 200} />;
@@ -66,13 +74,21 @@ function renderInput(f: FieldDef, refOptions: Record<string, FieldOption[]>) {
         />
       );
     case "ref":
+      if (!refOptions?.[f.name] && f.ref)
+        return (
+          <EntitySelect
+            entity={f.ref}
+            allowClear={!f.required}
+            placeholder={f.placeholder ?? `Select ${f.label.toLowerCase()}`}
+          />
+        );
       return (
         <Select
           showSearch
           allowClear={!f.required}
           optionFilterProp="label"
           placeholder={f.placeholder ?? `Select ${f.label.toLowerCase()}`}
-          options={refOptions[f.name] ?? []}
+          options={refOptions?.[f.name] ?? []}
         />
       );
     case "date":
@@ -84,19 +100,30 @@ function renderInput(f: FieldDef, refOptions: Record<string, FieldOption[]>) {
   }
 }
 
-export function MasterForm({ def, open, editing, refOptions, onClose, onSaved }: MasterFormProps) {
+export function MasterForm({
+  def,
+  open,
+  editing,
+  refOptions,
+  prefill,
+  onClose,
+  onSaved,
+}: MasterFormProps) {
   const [form] = Form.useForm<FormValues>();
   const { message } = App.useApp();
 
   useEffect(() => {
     if (open) {
       form.resetFields();
-      form.setFieldsValue(initialValues(def, editing) as Parameters<typeof form.setFieldsValue>[0]);
+      form.setFieldsValue(
+        initialValues(def, editing, prefill) as Parameters<typeof form.setFieldsValue>[0],
+      );
     }
-  }, [open, editing, def, form]);
+  }, [open, editing, def, form, prefill]);
 
   async function submit() {
-    const values = await form.validateFields();
+    const values = await form.validateFields().catch(() => null);
+    if (!values) return; // the form shows what is missing
     const result = await saveEntityAction(def.key, editing?.id ?? null, toPayload(def, values));
     if (!result.ok) {
       if (result.fieldErrors) {
@@ -108,7 +135,7 @@ export function MasterForm({ def, open, editing, refOptions, onClose, onSaved }:
       return;
     }
     message.success(editing ? `${def.singular} updated` : `${def.singular} added`);
-    onSaved();
+    onSaved(result.data.id);
   }
 
   return (

@@ -7,6 +7,7 @@ import { tenantDb } from "@/server/db/tenant";
 import { createMoneyAccount } from "@/server/services/accounts/moneyAccountService";
 import { createAirInvoice, getAirInvoice } from "@/server/services/invoices/airInvoiceService";
 import { saveMaster } from "@/server/services/masters/masterService";
+import { findClientByPhone, quickCreateClient } from "@/server/services/parties/quickClient";
 import { makeAgency } from "@/tests/integration/helpers";
 
 let A: Awaited<ReturnType<typeof makeAgency>>;
@@ -26,7 +27,8 @@ beforeAll(async () => {
     })
   ).id;
   airlineId = (await tenantDb(A.agency.id).airline.findFirstOrThrow({ where: { iata: "EK" } })).id;
-  cashId = (await createMoneyAccount(A.ctx, { name: "Cash", kind: "CASH", openingBalance: "0" })).id;
+  cashId = (await createMoneyAccount(A.ctx, { name: "Cash", kind: "CASH", openingBalance: "0" }))
+    .id;
 });
 
 const ticket = (ticketNo: string, extra: Record<string, unknown> = {}) => ({
@@ -56,7 +58,15 @@ describe("invoice with a new client", () => {
           issueDate: "2026-10-25",
           extraFee: "500",
           segments: [
-            { from: "dac", to: "dxb", airline: "EK", flightNo: "EK585", date: "2026-11-12", departs: "10:35", arrives: "13:55" },
+            {
+              from: "dac",
+              to: "dxb",
+              airline: "EK",
+              flightNo: "EK585",
+              date: "2026-11-12",
+              departs: "10:35",
+              arrives: "13:55",
+            },
             { from: "DXB", to: "DAC", flightNo: "EK584", date: "2026-11-26" },
           ],
         }),
@@ -71,7 +81,12 @@ describe("invoice with a new client", () => {
     const t = inv.tickets[0]!;
     expect([t.issueDate, t.extraFee]).toEqual(["2026-10-25", "500.00"]);
     expect(t.segments).toHaveLength(2);
-    expect(t.segments[0]).toMatchObject({ from: "DAC", to: "DXB", flightNo: "EK585", departs: "10:35" });
+    expect(t.segments[0]).toMatchObject({
+      from: "DAC",
+      to: "DXB",
+      flightNo: "EK585",
+      departs: "10:35",
+    });
     const bal = await prisma.client.findUniqueOrThrow({ where: { id: inv.client.id } });
     expect(bal.balance.toFixed(2)).toBe("48500.00");
   });
@@ -91,7 +106,11 @@ describe("invoice with a new client", () => {
 
   it("needs either a client or a new client", async () => {
     await expect(
-      createAirInvoice(A.ctx, { date: "2026-10-25", tickets: [ticket("1761000000003")], post: true }),
+      createAirInvoice(A.ctx, {
+        date: "2026-10-25",
+        tickets: [ticket("1761000000003")],
+        post: true,
+      }),
     ).rejects.toThrow(/Choose a client/);
   });
 
@@ -104,6 +123,42 @@ describe("invoice with a new client", () => {
         post: true,
       }),
     ).rejects.toThrow(/extra fee is part of the client price/);
+  });
+});
+
+describe('"+ Add new client" from the client picker', () => {
+  it("creates the client at once, with a code, normalised mobile and an audit entry", async () => {
+    const { id } = await quickCreateClient(A.ctx, {
+      name: "Rafiq Islam",
+      phone: "8801912000444",
+      email: "",
+    });
+    const c = await prisma.client.findUniqueOrThrow({ where: { id } });
+    expect([c.name, c.phone, c.type, c.email]).toEqual([
+      "Rafiq Islam",
+      "01912000444",
+      "INDIVIDUAL",
+      null,
+    ]);
+    expect(c.code).toMatch(/^CL-\d{5}$/);
+    const audit = await tenantDb(A.agency.id).auditLog.findFirst({
+      where: { entity: "Client", entityId: id, action: "CREATE" },
+    });
+    expect(audit).not.toBeNull();
+  });
+
+  it("finds the client who already has a mobile number, in any format", async () => {
+    expect(await findClientByPhone(A.ctx, "+8801912000444")).toMatchObject({
+      label: expect.stringMatching(/^Rafiq Islam \(CL-\d{5}\)$/),
+    });
+    expect(await findClientByPhone(A.ctx, "01912000999")).toBeNull();
+    expect(await findClientByPhone(A.ctx, "12")).toBeNull();
+  });
+
+  it("refuses a second client with the same mobile number", async () => {
+    await expect(
+      quickCreateClient(A.ctx, { name: "Another Rafiq", phone: "01912000444" }),
+    ).rejects.toThrow(/Rafiq Islam .* already has this mobile number/);
   });
 });
 
@@ -155,6 +210,8 @@ describe("invoice with money received", () => {
       }),
     ).rejects.toThrow(/more than the invoice total/);
     expect(await prisma.invoice.count({ where: { agencyId: A.agency.id } })).toBe(count);
-    expect(await prisma.client.count({ where: { agencyId: A.agency.id, phone: "01611000555" } })).toBe(0);
+    expect(
+      await prisma.client.count({ where: { agencyId: A.agency.id, phone: "01611000555" } }),
+    ).toBe(0);
   });
 });

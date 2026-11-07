@@ -79,6 +79,7 @@ export function ReportFilters({
         <Labelled label={PARTIES[params.party].singular}>
           <div style={{ width: 300 }}>
             <PartySelect
+              creatable={false}
               key={params.party}
               id="report_partyId"
               party={params.party}
@@ -121,6 +122,7 @@ export function ReportFilters({
         <Labelled label="Client">
           <div style={{ width: 260 }}>
             <PartySelect
+              creatable={false}
               party="clients"
               value={params.clientId ?? null}
               onChange={(clientId) => setParams({ clientId })}
@@ -161,6 +163,7 @@ export function ReportFilters({
         <Labelled label="Vendor">
           <div style={{ width: 260 }}>
             <PartySelect
+              creatable={false}
               party="vendors"
               id="report_vendorId"
               value={params.vendorId ?? null}

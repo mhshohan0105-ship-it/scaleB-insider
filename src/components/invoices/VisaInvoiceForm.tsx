@@ -12,7 +12,6 @@ import {
   Form,
   Input,
   Row,
-  Select,
   Space,
   Tag,
   Typography,
@@ -40,6 +39,7 @@ import {
   type PaymentFormValues,
 } from "./InvoiceFormParts";
 import { VISA_STATUS_LABEL } from "./visaStatus";
+import { EntitySelect } from "@/components/select/EntitySelect";
 
 interface Line {
   id?: string | null;
@@ -273,7 +273,7 @@ export function VisaInvoiceForm({
                             </Col>
                             <Col xs={12} md={6} xxl={3}>
                               <Form.Item label="Visa type" name={[field.name, "visaTypeId"]}>
-                                <Select allowClear options={visaTypes} />
+                                <EntitySelect entity="visatypes" options={visaTypes} />
                               </Form.Item>
                             </Col>
                             <Col xs={24} md={8} xxl={4}>

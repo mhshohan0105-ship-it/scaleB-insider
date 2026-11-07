@@ -26,6 +26,7 @@ import { d } from "@/lib/calc/money";
 import { formatMoney } from "@/lib/format";
 import { MoneyInput } from "@/components/MoneyInput";
 import { THEME } from "@/components/Providers";
+import { EntitySelect } from "@/components/select/EntitySelect";
 
 export interface AccountOption {
   value: string;
@@ -250,6 +251,7 @@ export function ReceivePaymentCard({
   on: boolean;
   onChange: (on: boolean) => void;
 }) {
+  const form = Form.useFormInstance();
   return (
     <Card
       style={{ marginBottom: 16 }}
@@ -277,7 +279,16 @@ export function ReceivePaymentCard({
               name={["payment", "moneyAccountId"]}
               rules={[{ required: true, message: "Choose the account" }]}
             >
-              <Select options={accounts} placeholder="Cash, bank, bKash…" />
+              <EntitySelect
+                entity="moneyaccounts"
+                options={accounts}
+                allowClear={false}
+                placeholder="Cash, bank, bKash…"
+                onCreated={(a) => {
+                  const method = a.kind ? METHOD_BY_KIND[a.kind] : undefined;
+                  if (method) form.setFieldValue(["payment", "paymentMethod"], method);
+                }}
+              />
             </Form.Item>
           </Col>
           <Col xs={12} md={5}>

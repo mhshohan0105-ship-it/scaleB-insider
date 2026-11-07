@@ -45,6 +45,7 @@ import {
 } from "@/components/invoices/InvoiceFormParts";
 import { INVOICE_TYPE_INFO } from "@/lib/invoiceTypes";
 import { createInvoiceAction, updateInvoiceAction } from "../invoiceActions";
+import { EntitySelect } from "@/components/select/EntitySelect";
 
 interface SegmentForm {
   from?: string;
@@ -85,7 +86,6 @@ type PaymentForm = PaymentFormValues;
 
 interface InvoiceForm {
   clientId?: string | null;
-  newClient?: Record<string, unknown>;
   date?: Dayjs;
   dueDate?: Dayjs | null;
   salesmanId?: string | null;
@@ -382,13 +382,7 @@ export function AirInvoiceForm(props: Props) {
                 </Col>
                 <Col xs={24} md={12}>
                   <Form.Item label="Sold by" name="salesmanId">
-                    <Select
-                      allowClear
-                      showSearch
-                      optionFilterProp="label"
-                      options={employees}
-                      placeholder="Employee"
-                    />
+                    <EntitySelect entity="employees" options={employees} placeholder="Employee" />
                   </Form.Item>
                 </Col>
                 <Col xs={24} md={12}>
@@ -482,11 +476,11 @@ export function AirInvoiceForm(props: Props) {
                               name={[field.name, "airlineId"]}
                               rules={[{ required: true, message: "Choose the airline" }]}
                             >
-                              <Select
-                                showSearch
-                                optionFilterProp="label"
+                              <EntitySelect
+                                entity="airlines"
                                 options={airlines}
                                 placeholder="Airline"
+                                allowClear={false}
                               />
                             </Form.Item>
                           </Col>

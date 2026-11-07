@@ -8,16 +8,21 @@ test("air ticket invoice → partial money receipt → ledgers → vendor paymen
   const client = `E2E Traveller ${stamp}`;
   await signIn(page, "admin");
 
-  // A fresh client, so earlier runs' invoices don't take the payment first.
-  await open(page, "/clients");
-  await page.getByRole("button", { name: "Add Client" }).click();
-  await page.getByRole("dialog").getByLabel("Client name").fill(client);
-  await page.getByRole("dialog").getByRole("button", { name: "Add" }).click();
+  // A fresh client (so earlier runs' invoices don't take the payment first),
+  // added from the bottom of the client picker without leaving the invoice.
+  await open(page, "/invoices/airticket/new");
+  const clientBox = page.getByRole("combobox", { name: "Client", exact: true });
+  await clientBox.click();
+  await clientBox.fill(client);
+  await page.getByRole("button", { name: `Add "${client}" as new client` }).click();
+  const dialog = page.getByRole("dialog", { name: "Add Client" });
+  await expect(dialog.getByLabel("Client name")).toHaveValue(client);
+  await dialog.getByLabel("Mobile").fill(`017${stamp.slice(-8)}`);
+  await dialog.getByRole("button", { name: "Add" }).click();
   await expect(page.getByText("Client added")).toBeVisible();
+  await expect(page.locator(".ant-select-selection-item", { hasText: client })).toBeVisible();
 
   // 1. Invoice with one ticket: 40,000 base + 10,000 tax, 7% commission, sold at 49,500.
-  await open(page, "/invoices/airticket/new");
-  await choose(page, "Client", client, stamp);
   await page.getByLabel("Ticket no.").fill(ticketNo);
   await page.locator("#airInvoice_tickets_0_pnr").fill("E2EPNR");
   await choose(page, "Airline", "Emirates", "Emirates");

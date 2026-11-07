@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { PermissionsProvider } from "@/components/PermissionsProvider";
 import { AppShell } from "@/components/shell/AppShell";
 import { NAV } from "@/lib/nav";
 import { can } from "@/lib/permissions";
@@ -22,7 +23,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       }}
       logoutAction={logoutAction}
     >
-      {children}
+      <PermissionsProvider permissions={ctx.permissions}>{children}</PermissionsProvider>
     </AppShell>
   );
 }

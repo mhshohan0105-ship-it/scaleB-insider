@@ -3,47 +3,21 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  App,
-  Button,
-  Card,
-  Col,
-  Form,
-  Input,
-  Modal,
-  Popconfirm,
-  Row,
-  Select,
-  Space,
-  Table,
-  Tabs,
-  Tag,
-  Typography,
-} from "antd";
+import { App, Button, Card, Popconfirm, Space, Table, Tabs, Tag, Typography } from "antd";
 import type { TableColumnsType } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import Decimal from "decimal.js";
 import { formatMoney } from "@/lib/format";
 import { MONEY_ACCOUNT_KIND_OPTIONS } from "@/lib/schemas/accounts";
 import type { LedgerRow, MoneyAccountRow } from "@/server/services/accounts/moneyAccountService";
-import { MoneyInput } from "@/components/MoneyInput";
 import { PageHeader } from "@/components/PageHeader";
+import { MoneyAccountModal } from "@/components/accounts/MoneyAccountModal";
 import { applyActionResult } from "@/components/formResult";
 import type { PeriodRow } from "@/server/services/accounts/periodService";
 import { PeriodsTable } from "./PeriodsTable";
-import { saveMoneyAccountAction, setMoneyAccountActiveAction } from "./actions";
+import { setMoneyAccountActiveAction } from "./actions";
 
 const KIND_LABEL = Object.fromEntries(MONEY_ACCOUNT_KIND_OPTIONS.map((o) => [o.value, o.label]));
-interface AccountForm {
-  name: string;
-  kind: string;
-  bankName?: string | null;
-  accountNo?: string | null;
-  branch?: string | null;
-  openingBalance: string;
-  note?: string | null;
-}
-
 const TYPE_COLOR: Record<string, string> = {
   ASSET: "blue",
   LIABILITY: "orange",
@@ -67,22 +41,8 @@ export function AccountsListPage({
 }) {
   const router = useRouter();
   const { message } = App.useApp();
-  const [form] = Form.useForm<AccountForm>();
   const [editing, setEditing] = useState<MoneyAccountRow | "new" | null>(null);
-  const [saving, setSaving] = useState(false);
-  const kind = Form.useWatch("kind", form);
   const row = editing && editing !== "new" ? editing : null;
-
-  async function save() {
-    const values = await form.validateFields();
-    setSaving(true);
-    const result = await saveMoneyAccountAction(row?.id ?? null, values);
-    setSaving(false);
-    if (applyActionResult(result, form, message, row ? "Account updated" : "Account added")) {
-      setEditing(null);
-      router.refresh();
-    }
-  }
 
   const moneyColumns: TableColumnsType<MoneyAccountRow> = [
     {
@@ -122,14 +82,7 @@ export function AccountsListPage({
             align: "right" as const,
             render: (_: unknown, a: MoneyAccountRow) => (
               <Space size={4}>
-                <Button
-                  type="link"
-                  size="small"
-                  onClick={() => {
-                    setEditing(a);
-                    form.setFieldsValue({ ...a, accountNo: "" });
-                  }}
-                >
+                <Button type="link" size="small" onClick={() => setEditing(a)}>
                   Edit
                 </Button>
                 <Popconfirm
@@ -185,15 +138,7 @@ export function AccountsListPage({
         description="Cash, bank, mobile banking and card accounts, and the chart of accounts behind them."
         extra={
           canCreate && (
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => {
-                setEditing("new");
-                form.resetFields();
-                form.setFieldsValue({ kind: "BANK", openingBalance: "0" });
-              }}
-            >
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setEditing("new")}>
               Add Account
             </Button>
           )
@@ -248,84 +193,15 @@ export function AccountsListPage({
         />
       </Card>
 
-      <Modal
+      <MoneyAccountModal
         open={editing !== null}
-        title={row ? `Edit ${row.name}` : "Add Account"}
-        okText={row ? "Save changes" : "Add"}
-        confirmLoading={saving}
-        onOk={save}
-        onCancel={() => setEditing(null)}
-        forceRender
-      >
-        <Form form={form} name="moneyAccount" layout="vertical" requiredMark="optional">
-          <Row gutter={16}>
-            <Col span={14}>
-              <Form.Item
-                label="Account name"
-                name="name"
-                rules={[{ required: true, message: "Account name is required" }]}
-              >
-                <Input maxLength={80} placeholder="e.g. City Bank Current" />
-              </Form.Item>
-            </Col>
-            <Col span={10}>
-              <Form.Item label="Type" name="kind" rules={[{ required: true }]}>
-                <Select options={[...MONEY_ACCOUNT_KIND_OPTIONS]} />
-              </Form.Item>
-            </Col>
-            {kind !== "CASH" && (
-              <>
-                <Col span={12}>
-                  <Form.Item
-                    label={kind === "MOBILE_BANKING" ? "Provider" : "Bank"}
-                    name="bankName"
-                  >
-                    <Input
-                      maxLength={120}
-                      placeholder={kind === "MOBILE_BANKING" ? "bKash, Nagad, ..." : undefined}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    label="Account / wallet number"
-                    name="accountNo"
-                    extra={
-                      row?.accountNoMasked
-                        ? `Stored as ${row.accountNoMasked}. Leave blank to keep it.`
-                        : "Only the last 4 digits are stored."
-                    }
-                  >
-                    <Input maxLength={40} autoComplete="off" />
-                  </Form.Item>
-                </Col>
-                {kind === "BANK" && (
-                  <Col span={24}>
-                    <Form.Item label="Branch" name="branch">
-                      <Input maxLength={120} />
-                    </Form.Item>
-                  </Col>
-                )}
-              </>
-            )}
-            <Col span={24}>
-              <Form.Item
-                label="Opening balance"
-                name="openingBalance"
-                rules={[{ required: true, message: "Opening balance is required" }]}
-                extra="Money in this account when you started using scaleB Insider."
-              >
-                <MoneyInput />
-              </Form.Item>
-            </Col>
-            <Col span={24}>
-              <Form.Item label="Note" name="note">
-                <Input.TextArea rows={2} maxLength={500} />
-              </Form.Item>
-            </Col>
-          </Row>
-        </Form>
-      </Modal>
+        editing={row}
+        onClose={() => setEditing(null)}
+        onSaved={() => {
+          setEditing(null);
+          router.refresh();
+        }}
+      />
     </>
   );
 }

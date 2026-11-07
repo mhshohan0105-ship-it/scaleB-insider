@@ -12,6 +12,7 @@ import {
   searchEntityOptions,
   setMasterActive,
 } from "@/server/services/masters/masterService";
+import { findClientByPhone, quickCreateClient } from "@/server/services/parties/quickClient";
 
 function assertKey(key: string): asserts key is EntityKey {
   if (!isEntityKey(key)) throw new ServiceError("Unknown list");
@@ -30,6 +31,22 @@ export async function setEntityActiveAction(key: string, id: string, active: boo
     assertKey(key);
     const ctx = await requirePermission(entityModule(ENTITIES[key]), "edit");
     await setMasterActive(ctx, key, id, active);
+  });
+}
+
+/** "+ Add new client" from a client picker (name, mobile, type, email, address). */
+export async function quickCreateClientAction(values: unknown) {
+  return runAction(async () => {
+    const ctx = await requirePermission("clients", "create");
+    return quickCreateClient(ctx, values);
+  });
+}
+
+/** The client who already has this mobile number, if any. */
+export async function findClientByPhoneAction(phone: string) {
+  return runAction(async () => {
+    const ctx = await requirePermission("clients", "view");
+    return findClientByPhone(ctx, phone.slice(0, 20));
   });
 }
 

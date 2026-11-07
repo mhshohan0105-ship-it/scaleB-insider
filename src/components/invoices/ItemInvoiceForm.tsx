@@ -41,6 +41,7 @@ import {
   type AccountOption,
   type PaymentFormValues,
 } from "./InvoiceFormParts";
+import { EntitySelect } from "@/components/select/EntitySelect";
 
 export type ItemFormType = "OTHER" | "OTHER_PACKAGE" | "TOUR" | "UMRAH" | "HAJJ_PRE_REG" | "HAJJ";
 
@@ -176,6 +177,12 @@ export function ItemInvoiceForm({
   const [form] = Form.useForm<FormValues>();
   const [pending, startTransition] = useTransition();
   const values = Form.useWatch([], form) as FormValues | undefined;
+
+  /** A blank line description takes the chosen product's name. */
+  function describe(line: number, label: string | undefined) {
+    if (label && !form.getFieldValue(["items", line, "description"]))
+      form.setFieldValue(["items", line, "description"], label);
+  }
   const [receive, setReceive] = useState(false);
   const canReceive = mode === "create" && accounts.length > 0;
   const basePath = INVOICE_TYPE_INFO[type].path;
@@ -291,26 +298,14 @@ export function ItemInvoiceForm({
       {tour && (
         <Col xs={24} md={12} xxl={8}>
           <Form.Item label="Tour group" name="tourGroupId">
-            <Select
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              options={options.tourGroups}
-              placeholder="Optional"
-            />
+            <EntitySelect entity="tourgroups" options={options.tourGroups} placeholder="Optional" />
           </Form.Item>
         </Col>
       )}
       {umrah && (
         <Col xs={24} md={12} xxl={8}>
           <Form.Item label="Group" name="groupId">
-            <Select
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              options={options.groups}
-              placeholder="Optional"
-            />
+            <EntitySelect entity="groups" options={options.groups} placeholder="Optional" />
           </Form.Item>
         </Col>
       )}
@@ -431,7 +426,10 @@ export function ItemInvoiceForm({
                                 {type === "HAJJ" && (
                                   <Col xs={12} md={4} xxl={2}>
                                     <Form.Item label="Room" name={[field.name, "roomTypeId"]}>
-                                      <Select allowClear options={options.roomTypes} />
+                                      <EntitySelect
+                                        entity="roomtypes"
+                                        options={options.roomTypes}
+                                      />
                                     </Form.Item>
                                   </Col>
                                 )}
@@ -454,7 +452,7 @@ export function ItemInvoiceForm({
                                 </Col>
                                 <Col xs={12} md={4} xxl={3}>
                                   <Form.Item label="Room" name={[field.name, "roomTypeId"]}>
-                                    <Select allowClear options={options.roomTypes} />
+                                    <EntitySelect entity="roomtypes" options={options.roomTypes} />
                                   </Form.Item>
                                 </Col>
                               </>
@@ -469,27 +467,16 @@ export function ItemInvoiceForm({
                                 ) : (
                                   <Col xs={12} md={6} xxl={4}>
                                     <Form.Item label="Product" name={[field.name, "productId"]}>
-                                      <Select
-                                        allowClear
-                                        showSearch
-                                        optionFilterProp="label"
+                                      <EntitySelect
+                                        entity="products"
                                         options={options.products}
-                                        onChange={(_, opt) => {
-                                          const label = (opt as FieldOption | undefined)?.label;
-                                          if (
-                                            label &&
-                                            !form.getFieldValue([
-                                              "items",
-                                              field.name,
-                                              "description",
-                                            ])
-                                          ) {
-                                            form.setFieldValue(
-                                              ["items", field.name, "description"],
-                                              label,
-                                            );
-                                          }
-                                        }}
+                                        onCreated={(o) => describe(field.name, o.label)}
+                                        onChange={(id) =>
+                                          describe(
+                                            field.name,
+                                            options.products.find((p) => p.value === id)?.label,
+                                          )
+                                        }
                                       />
                                     </Form.Item>
                                   </Col>

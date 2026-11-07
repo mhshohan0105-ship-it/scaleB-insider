@@ -6,9 +6,7 @@ test("home page leads to sign-up, which opens a trial agency and signs the owner
 }) => {
   const stamp = Date.now().toString();
   await open(page, "/");
-  await expect(
-    page.getByRole("heading", { name: "Run your travel agency on one set of books." }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: /One set of books for/ })).toBeVisible();
   await page.getByRole("link", { name: /Start 14 day free trial/ }).click();
   await expect(page).toHaveURL(/\/signup/);
   await page.locator('html[data-hydrated="true"]').waitFor();

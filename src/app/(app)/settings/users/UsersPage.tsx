@@ -33,6 +33,7 @@ import {
   setUserActiveAction,
   updateUserAction,
 } from "../actions";
+import { EntitySelect } from "@/components/select/EntitySelect";
 
 interface UsersPageProps {
   rows: UserRow[];
@@ -259,7 +260,7 @@ export function UsersPage({
             name="employeeId"
             extra="Optional. Used for salesman reports."
           >
-            <Select allowClear showSearch optionFilterProp="label" options={options.employees} />
+            <EntitySelect entity="employees" options={options.employees} />
           </Form.Item>
           <Form.Item
             label="Email"

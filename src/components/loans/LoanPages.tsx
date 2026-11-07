@@ -51,6 +51,7 @@ import {
   voidLoanAction,
   voidLoanPaymentAction,
 } from "@/app/(app)/vouchers/actions";
+import { EntitySelect } from "@/components/select/EntitySelect";
 
 const KIND_LABEL: Record<string, string> = {
   TAKEN: "Loan taken",
@@ -375,12 +376,7 @@ export function LoansPage({
                   name="authorityId"
                   rules={[{ required: true, message: "Choose who" }]}
                 >
-                  <Select
-                    showSearch
-                    optionFilterProp="label"
-                    options={authorities}
-                    notFoundContent={<Link href="/loans/authorities">Add authorities first</Link>}
-                  />
+                  <EntitySelect entity="loanauthorities" options={authorities} allowClear={false} />
                 </Form.Item>
               </Col>
               <Col xs={12} md={6} xl={4}>
@@ -408,7 +404,7 @@ export function LoansPage({
                   name="moneyAccountId"
                   rules={[{ required: true, message: "Choose the account" }]}
                 >
-                  <Select showSearch optionFilterProp="label" options={accounts} />
+                  <EntitySelect entity="moneyaccounts" options={accounts} allowClear={false} />
                 </Form.Item>
               </Col>
               <Col xs={12} md={6} xl={4}>
@@ -726,7 +722,7 @@ export function LoanPaymentsPage({
                   name="moneyAccountId"
                   rules={[{ required: true, message: "Choose the account" }]}
                 >
-                  <Select showSearch optionFilterProp="label" options={accounts} />
+                  <EntitySelect entity="moneyaccounts" options={accounts} allowClear={false} />
                 </Form.Item>
               </Col>
               <Col xs={12} md={6} xl={4}>

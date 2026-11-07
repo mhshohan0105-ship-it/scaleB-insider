@@ -2,19 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  App,
-  Button,
-  Card,
-  Col,
-  DatePicker,
-  Flex,
-  Form,
-  Input,
-  InputNumber,
-  Row,
-  Select,
-} from "antd";
+import { App, Button, Card, Col, DatePicker, Flex, Form, Input, InputNumber, Row } from "antd";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import type { FieldOption } from "@/lib/masters";
@@ -23,6 +11,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { PartySelect } from "@/components/PartySelect";
 import { applyActionResult } from "@/components/formResult";
 import { createTransferAction } from "@/app/(app)/hajj/actions";
+import { EntitySelect } from "@/components/select/EntitySelect";
 
 interface PilgrimRowValues {
   name?: string;
@@ -122,7 +111,7 @@ export function TransferInForm({ today, groups }: { today: string; groups: Field
             </Col>
             <Col xs={12} md={6} xl={6}>
               <Form.Item label="Group" name="groupId">
-                <Select allowClear showSearch optionFilterProp="label" options={groups} />
+                <EntitySelect entity="groups" options={groups} />
               </Form.Item>
             </Col>
             <Col xs={12} md={6} xl={6}>

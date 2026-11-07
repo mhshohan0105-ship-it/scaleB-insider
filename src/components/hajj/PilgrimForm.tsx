@@ -22,6 +22,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { PartySelect } from "@/components/PartySelect";
 import { applyActionResult } from "@/components/formResult";
 import { savePilgrimAction } from "@/app/(app)/hajj/actions";
+import { EntitySelect } from "@/components/select/EntitySelect";
 
 const DATE_FIELDS = ["dateOfBirth", "passportExpiry", "preRegDate"] as const;
 type DateField = (typeof DATE_FIELDS)[number];
@@ -126,7 +127,7 @@ export function PilgrimForm({
               <>
                 <Col xs={12} md={6} xl={6}>
                   <Form.Item label="Group" name="groupId">
-                    <Select allowClear showSearch optionFilterProp="label" options={groups} />
+                    <EntitySelect entity="groups" options={groups} />
                   </Form.Item>
                 </Col>
                 <Col xs={24} md={12} xl={6}>
@@ -208,7 +209,7 @@ export function PilgrimForm({
             </Col>
             <Col xs={12} md={6} xl={4}>
               <Form.Item label="Maharam relation" name="maharamId">
-                <Select allowClear showSearch optionFilterProp="label" options={maharams} />
+                <EntitySelect entity="maharam" options={maharams} />
               </Form.Item>
             </Col>
             <Col xs={12} md={6} xl={8}>

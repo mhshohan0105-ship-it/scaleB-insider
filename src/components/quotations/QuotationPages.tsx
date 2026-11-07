@@ -55,6 +55,7 @@ import {
   saveQuotationAction,
   setQuotationStatusAction,
 } from "@/app/(app)/documents/actions";
+import { EntitySelect } from "@/components/select/EntitySelect";
 
 const STATUS: Record<string, { color: string; label: string }> = {
   DRAFT: { color: "default", label: "Draft" },
@@ -344,7 +345,7 @@ export function QuotationForm({
                     </Col>
                     <Col xs={12} md={6} xl={4}>
                       <Form.Item label="Product" name={[f.name, "productId"]}>
-                        <Select allowClear showSearch optionFilterProp="label" options={products} />
+                        <EntitySelect entity="products" options={products} />
                       </Form.Item>
                     </Col>
                     <Col xs={6} md={3} xl={2}>

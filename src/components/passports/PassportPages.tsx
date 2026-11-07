@@ -50,6 +50,7 @@ import {
   savePassportAction,
   setPassportActiveAction,
 } from "@/app/(app)/documents/actions";
+import { EntitySelect } from "@/components/select/EntitySelect";
 
 export function ExpiryTag({ state, days }: { state: ExpiryState; days: number }) {
   const text =
@@ -362,11 +363,7 @@ export function PassportForm({
             </Col>
             <Col xs={12} md={6} xl={4}>
               <Form.Item label="Status" name="statusId">
-                <Select
-                  allowClear
-                  options={statuses}
-                  notFoundContent={<Link href="/settings/passportstatus">Add statuses</Link>}
-                />
+                <EntitySelect entity="passportstatus" options={statuses} />
               </Form.Item>
             </Col>
             <Col xs={12} md={6} xl={4}>
@@ -580,7 +577,7 @@ export function PassportDetail({
             name="statusId"
             rules={[{ required: true, message: "Choose the status" }]}
           >
-            <Select options={statuses} />
+            <EntitySelect entity="passportstatus" options={statuses} allowClear={false} />
           </Form.Item>
           <Form.Item label="Note" name="note">
             <Input maxLength={300} />

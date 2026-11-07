@@ -39,6 +39,7 @@ import {
   refundableInvoicesAction,
 } from "@/app/(app)/refunds/actions";
 import type { RefundTarget } from "@/server/services/refund/postRefund";
+import { EntitySelect } from "@/components/select/EntitySelect";
 
 interface LineValues {
   lineId: string;
@@ -485,7 +486,11 @@ export function RefundForm({ type, today, initialTarget, accounts }: Props) {
                         name="moneyAccountId"
                         rules={[{ required: true, message: "Choose the account" }]}
                       >
-                        <Select showSearch optionFilterProp="label" options={accounts} />
+                        <EntitySelect
+                          entity="moneyaccounts"
+                          options={accounts}
+                          allowClear={false}
+                        />
                       </Form.Item>
                     </Col>
                     <Col span={12}>

@@ -11,6 +11,7 @@ import { formatMoney } from "@/lib/format";
 import { ChequeFields, withChequeDate } from "@/components/payments/ChequeFields";
 import { MoneyInput } from "@/components/MoneyInput";
 import { PartySelect } from "@/components/PartySelect";
+import { EntitySelect } from "@/components/select/EntitySelect";
 import { applyActionResult } from "@/components/formResult";
 
 export interface AccountOption {
@@ -127,7 +128,14 @@ export function PaymentFormCard(props: Props) {
               name="moneyAccountId"
               rules={[{ required: true, message: "Choose the account" }]}
             >
-              <Select showSearch optionFilterProp="label" options={options} />
+              <EntitySelect
+                entity="moneyaccounts"
+                options={options}
+                allowClear={false}
+                onCreated={(a) => {
+                  if (a.kind) form.setFieldValue("paymentMethod", KIND_TO_METHOD[a.kind] ?? "BANK");
+                }}
+              />
             </Form.Item>
           </Col>
           {full && (

@@ -25,6 +25,7 @@ import { MoneyInput } from "@/components/MoneyInput";
 import { PageHeader } from "@/components/PageHeader";
 import { applyActionResult } from "@/components/formResult";
 import { createTransferAction } from "@/app/(app)/hajj/actions";
+import { EntitySelect } from "@/components/select/EntitySelect";
 
 type Kind = "MOALLEM" | "GROUP" | "OUT";
 
@@ -181,7 +182,7 @@ export function TransferForm({ type, today, pilgrims, groups, listPath }: Props)
                   name="groupId"
                   rules={[{ required: true, message: "Choose the new group" }]}
                 >
-                  <Select showSearch optionFilterProp="label" options={groups} />
+                  <EntitySelect entity="groups" options={groups} allowClear={false} />
                 </Form.Item>
               )}
               {type === "OUT" && (

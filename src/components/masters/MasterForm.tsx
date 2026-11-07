@@ -74,21 +74,14 @@ function renderInput(f: FieldDef, refOptions?: Record<string, FieldOption[]>) {
         />
       );
     case "ref":
-      if (!refOptions?.[f.name] && f.ref)
-        return (
-          <EntitySelect
-            entity={f.ref}
-            allowClear={!f.required}
-            placeholder={f.placeholder ?? `Select ${f.label.toLowerCase()}`}
-          />
-        );
+      if (!f.ref) return null;
+      // Page-loaded options when the list page has them, else a server search.
       return (
-        <Select
-          showSearch
+        <EntitySelect
+          entity={f.ref}
+          options={refOptions?.[f.name]}
           allowClear={!f.required}
-          optionFilterProp="label"
           placeholder={f.placeholder ?? `Select ${f.label.toLowerCase()}`}
-          options={refOptions?.[f.name] ?? []}
         />
       );
     case "date":

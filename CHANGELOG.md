@@ -349,4 +349,11 @@ Known: a dev-only React 19 warning about `element.ref` comes from antd's AutoCom
 
 Verified: `npm run check` green (226 unit + 139 integration; one integration run of five had a single failure that did not repeat), Playwright 28/28 on port 3137, with the air ticket test now adding its client from the picker.
 
-Next: the same picker in refunds, money receipts, quotations, passports, Hajj, vouchers, loans and payroll.
+
+## Add new from any picker, part 2: every other form (2026-11-07)
+
+- "+ Add new" now ends every picker of a list the agency keeps: accounts in money receipts, refunds, vendor payments, advance returns, balance transfers, expenses and other vouchers, loans and payroll; expense heads; lenders, borrowers and investors (loan authorities); employees in vouchers, payroll and users; passport status; products on quotations; Hajj groups and maharam relations; and the ref fields of the Settings forms (e.g. a client's category or company).
+- Expense heads and loan authorities join the picker with a short pop-up (name and details), using the same server actions as their own pages.
+- Left as plain pickers on purpose: filters, fixed choices (pax type, class, status, payment method), pickers of existing documents (invoice to refund, ticket to reissue, loan to repay, investment, pilgrims on a transfer or Hajj invoice) and user roles, which need the full permission matrix on Settings > Roles.
+
+Verified: `npm run check` green (226 unit + 139 integration), Playwright 28/28 on port 3137; expense head and loan authority added from their pickers in the browser.

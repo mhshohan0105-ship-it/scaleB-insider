@@ -12,7 +12,6 @@ import {
   Form,
   Input,
   Row,
-  Select,
   Space,
   Statistic,
   Typography,
@@ -37,6 +36,7 @@ import {
   payrollDefaultsAction,
   voidPayrollAction,
 } from "@/app/(app)/vouchers/actions";
+import { EntitySelect } from "@/components/select/EntitySelect";
 
 interface Props {
   data: PayrollList;
@@ -247,11 +247,11 @@ export function PayrollPage({
                   name="employeeId"
                   rules={[{ required: true, message: "Choose the employee" }]}
                 >
-                  <Select
-                    showSearch
-                    optionFilterProp="label"
+                  <EntitySelect
+                    entity="employees"
                     options={employees}
-                    onChange={pickEmployee}
+                    allowClear={false}
+                    onChange={(id) => id && void pickEmployee(id)}
                   />
                 </Form.Item>
               </Col>
@@ -293,7 +293,7 @@ export function PayrollPage({
                   name="moneyAccountId"
                   rules={[{ required: true, message: "Choose the account" }]}
                 >
-                  <Select showSearch optionFilterProp="label" options={accounts} />
+                  <EntitySelect entity="moneyaccounts" options={accounts} allowClear={false} />
                 </Form.Item>
               </Col>
               <Col xs={12} md={6} xl={4}>

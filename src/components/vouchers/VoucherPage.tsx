@@ -38,6 +38,7 @@ import { VoidButton } from "@/components/VoidButton";
 import { applyActionResult } from "@/components/formResult";
 import { useUrlParams } from "@/components/useUrlParams";
 import { createVoucherAction, voidVoucherAction } from "@/app/(app)/vouchers/actions";
+import { EntitySelect } from "@/components/select/EntitySelect";
 
 export interface VoucherPageOptions {
   accounts: FieldOption[];
@@ -157,7 +158,7 @@ export function VoucherPage({
       name="moneyAccountId"
       rules={[{ required: true, message: "Choose the account" }]}
     >
-      <Select showSearch optionFilterProp="label" options={options.accounts} />
+      <EntitySelect entity="moneyaccounts" options={options.accounts} allowClear={false} />
     </Form.Item>
   );
 
@@ -183,12 +184,7 @@ export function VoucherPage({
             name="expenseHeadId"
             rules={[{ required: true, message: "Choose the head" }]}
           >
-            <Select
-              showSearch
-              optionFilterProp="label"
-              options={options.expenseHeads}
-              notFoundContent={<Link href="/expenses/heads">Add expense heads first</Link>}
-            />
+            <EntitySelect entity="expenseheads" options={options.expenseHeads} allowClear={false} />
           </Form.Item>
         </Col>
       )}
@@ -233,7 +229,7 @@ export function VoucherPage({
             name="partyId"
             rules={[{ required: true, message: "Choose the employee" }]}
           >
-            <Select showSearch optionFilterProp="label" options={options.employees} />
+            <EntitySelect entity="employees" options={options.employees} allowClear={false} />
           </Form.Item>
         </Col>
       )}

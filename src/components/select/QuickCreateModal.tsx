@@ -6,6 +6,7 @@ import { ENTITIES } from "@/lib/entities";
 import type { EntityKey } from "@/lib/masters";
 import { CLIENT_TYPE_OPTIONS } from "@/lib/parties";
 import { MasterForm } from "@/components/masters/MasterForm";
+import { saveExpenseHeadAction, saveLoanAuthorityAction } from "@/app/(app)/vouchers/actions";
 import { MoneyAccountModal } from "@/components/accounts/MoneyAccountModal";
 import { applyActionResult } from "@/components/formResult";
 import {
@@ -36,6 +37,16 @@ export function QuickCreateModal({ entity, open, typed, onClose, onCreated }: Pr
         initialName={typed}
         onClose={onClose}
         onSaved={(a) => onCreated({ value: a.id, label: a.name, kind: a.kind })}
+      />
+    );
+  if (entity === "expenseheads" || entity === "loanauthorities")
+    return (
+      <NamedRowModal
+        kind={entity}
+        open={open}
+        typed={typed}
+        onClose={onClose}
+        onCreated={onCreated}
       />
     );
   if (entity === "clients")
@@ -204,6 +215,84 @@ function QuickClientModal({ open, typed, onClose, onCreated }: Omit<Props, "enti
             </Form.Item>
           </Col>
         </Row>
+      </Form>
+    </Modal>
+  );
+}
+
+const AUTHORITY_TYPES = [
+  { value: "BANK", label: "Bank" },
+  { value: "PERSON", label: "Person" },
+  { value: "COMPANY", label: "Company" },
+];
+
+/** Expense heads and loan authorities: a name and a few details. */
+function NamedRowModal({
+  kind,
+  open,
+  typed,
+  onClose,
+  onCreated,
+}: Omit<Props, "entity"> & { kind: "expenseheads" | "loanauthorities" }) {
+  const { message } = App.useApp();
+  const [form] = Form.useForm<Record<string, string>>();
+  const [saving, setSaving] = useState(false);
+  const authority = kind === "loanauthorities";
+
+  useEffect(() => {
+    if (!open) return;
+    form.resetFields();
+    form.setFieldsValue({ name: typed.trim(), ...(authority ? { type: "BANK" } : {}) });
+  }, [open, typed, authority, form]);
+
+  async function save() {
+    const values = await form.validateFields().catch(() => null);
+    if (!values) return; // the form shows what is missing
+    setSaving(true);
+    const result = authority
+      ? await saveLoanAuthorityAction(null, values)
+      : await saveExpenseHeadAction(null, values);
+    setSaving(false);
+    if (
+      applyActionResult(result, form, message, authority ? "Authority added" : "Expense head added")
+    )
+      onCreated({ value: result.data.id, label: values.name!.trim() });
+  }
+
+  return (
+    <Modal
+      open={open}
+      title={authority ? "Add authority" : "Add expense head"}
+      okText="Add"
+      confirmLoading={saving}
+      onOk={save}
+      onCancel={onClose}
+      forceRender
+    >
+      <Form form={form} name={`quick_${kind}`} layout="vertical" requiredMark="optional">
+        <Form.Item
+          label="Name"
+          name="name"
+          rules={[{ required: true, min: 2, message: "Name is required" }]}
+        >
+          <Input maxLength={authority ? 120 : 80} />
+        </Form.Item>
+        {authority && (
+          <>
+            <Form.Item label="Type" name="type">
+              <Select options={AUTHORITY_TYPES} />
+            </Form.Item>
+            <Form.Item label="Phone" name="phone">
+              <Input maxLength={30} />
+            </Form.Item>
+            <Form.Item label="Address" name="address">
+              <Input maxLength={300} />
+            </Form.Item>
+          </>
+        )}
+        <Form.Item label="Note" name="note">
+          <Input maxLength={300} />
+        </Form.Item>
       </Form>
     </Modal>
   );

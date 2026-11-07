@@ -6,12 +6,26 @@ import { Button, Divider, Select, Spin, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { ENTITIES, entityModule } from "@/lib/entities";
 import type { EntityKey } from "@/lib/masters";
+import type { ModuleKey } from "@/lib/permissions";
 import { useCan } from "@/components/PermissionsProvider";
 import { searchEntityAction } from "@/app/(app)/entityActions";
 import { QuickCreateModal } from "./QuickCreateModal";
 
-/** Any list a picker can add to: the entity engine's lists, plus money accounts. */
-export type CreatableKey = EntityKey | "moneyaccounts";
+/** Lists outside the entity engine that a picker can add to. */
+const OTHER_LISTS = {
+  moneyaccounts: { singular: "Account", module: "accounts" },
+  expenseheads: { singular: "Expense Head", module: "expense" },
+  loanauthorities: { singular: "Authority", module: "loan" },
+} as const satisfies Record<string, { singular: string; module: ModuleKey }>;
+
+export type OtherListKey = keyof typeof OTHER_LISTS;
+
+/** Any list a picker can add to. */
+export type CreatableKey = EntityKey | OtherListKey;
+
+function isOtherList(key: CreatableKey): key is OtherListKey {
+  return key in OTHER_LISTS;
+}
 
 export interface PickOption {
   value: string;
@@ -38,11 +52,14 @@ export interface EntitySelectProps {
 }
 
 export function singularOf(entity: CreatableKey): string {
-  return entity === "moneyaccounts" ? "Account" : ENTITIES[entity].singular;
+  return isOtherList(entity) ? OTHER_LISTS[entity].singular : ENTITIES[entity].singular;
 }
 
 function useCanCreate(entity: CreatableKey) {
-  return useCan(entity === "moneyaccounts" ? "accounts" : entityModule(ENTITIES[entity]), "create");
+  return useCan(
+    isOtherList(entity) ? OTHER_LISTS[entity].module : entityModule(ENTITIES[entity]),
+    "create",
+  );
 }
 
 /**
@@ -75,7 +92,7 @@ export function EntitySelect({
   const canCreate = useCanCreate(entity) && creatable;
 
   function load(q: string) {
-    if (!searchServer || entity === "moneyaccounts") return;
+    if (!searchServer || isOtherList(entity)) return;
     const ticket = ++request.current;
     setLoading(true);
     void searchEntityAction(entity, q, value).then((r) => {

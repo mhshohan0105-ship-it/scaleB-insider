@@ -13,7 +13,6 @@ import {
   Input,
   Modal,
   Row,
-  Select,
   Tag,
   Typography,
 } from "antd";
@@ -29,6 +28,7 @@ import { MoneyInput } from "@/components/MoneyInput";
 import { PageHeader } from "@/components/PageHeader";
 import { applyActionResult } from "@/components/formResult";
 import { createBalanceTransferAction, voidBalanceTransferAction } from "../actions";
+import { EntitySelect } from "@/components/select/EntitySelect";
 
 interface AccountOption {
   value: string;
@@ -194,10 +194,10 @@ export function BalanceTransferPage({
                   name="fromAccountId"
                   rules={[{ required: true, message: "Choose the account to move money from" }]}
                 >
-                  <Select
-                    showSearch
-                    optionFilterProp="label"
+                  <EntitySelect
+                    entity="moneyaccounts"
                     options={accountOptions}
+                    allowClear={false}
                     placeholder="Select account"
                   />
                 </Form.Item>
@@ -215,10 +215,10 @@ export function BalanceTransferPage({
                     }),
                   ]}
                 >
-                  <Select
-                    showSearch
-                    optionFilterProp="label"
+                  <EntitySelect
+                    entity="moneyaccounts"
                     options={accountOptions}
+                    allowClear={false}
                     placeholder="Select account"
                   />
                 </Form.Item>

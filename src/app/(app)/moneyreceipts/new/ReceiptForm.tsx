@@ -32,6 +32,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { PartySelect } from "@/components/PartySelect";
 import { applyActionResult } from "@/components/formResult";
 import { createMoneyReceiptAction, dueInvoicesAction } from "../actions";
+import { EntitySelect } from "@/components/select/EntitySelect";
 
 interface FormValues {
   clientId?: string | null;
@@ -186,7 +187,7 @@ export function ReceiptForm({
                     name="moneyAccountId"
                     rules={[{ required: true, message: "Choose the account" }]}
                   >
-                    <Select showSearch optionFilterProp="label" options={accounts} />
+                    <EntitySelect entity="moneyaccounts" options={accounts} allowClear={false} />
                   </Form.Item>
                 </Col>
                 <Col span={12}>

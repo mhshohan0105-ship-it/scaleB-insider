@@ -390,3 +390,10 @@ Not built: online card or bKash merchant payments, and site-down monitoring, whi
 - The "Scale" letters and the B mark are drawn to match the parent ScaleB logo, not taken from its source file; replace them when the original vector file is available.
 
 Verified: `npm run check` green (240 unit + 151 integration), Playwright 30/30.
+
+## New home page and starting prices (2026-11-07)
+
+- **Home page** redesigned: dark night-sky look in the logo's colours, headings in the logo's rounded face (Comfortaa, `@fontsource/comfortaa`). A canvas globe turns with flights from Dhaka to Dubai, Jeddah, Medina, Doha, Kuala Lumpur, Singapore, Bangkok, London, Toronto, Istanbul and Guangzhou (drag to spin; paused off screen; still for reduced motion). Floating ticket, profit and visa cards tilt toward the pointer; the headline word flips through services; counters count up; an airline strip slides by; features and plans are boarding passes that tilt in 3D; a plane follows the route from quote to report as the page scrolls; plans switch between monthly and yearly; a WhatsApp button links to the platform phone.
+- **Starting prices** (migration `20261107210000_plan_prices`, only for plans still without a price): Starter BDT 1,500 a month / 15,000 a year, Standard 3,000 / 30,000, Premium 5,500 / 55,000. The admin can change them under Admin > Plans.
+
+Verified: `npm run check` green (240 unit + 151 integration); the sign-up e2e passes on the new page.

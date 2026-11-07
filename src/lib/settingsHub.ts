@@ -27,6 +27,7 @@ export const SETTINGS_HUB: HubSection[] = [
     title: "Agency",
     entries: [
       entry("Agency Profile", "profile", "Name, logo, address and what prints on invoices."),
+      entry("Subscription", "subscription", "Your plan, what it includes and when it renews."),
       entry("App Config", "app", "Invoice numbers, AIT and commission rules, fiscal year, SMS."),
       entry("Users", "users", "Who can sign in, their passwords and roles."),
       entry("Roles", "roles", "What each role may see and do."),

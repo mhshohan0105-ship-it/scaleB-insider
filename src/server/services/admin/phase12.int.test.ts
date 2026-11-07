@@ -26,7 +26,7 @@ import {
   consumeImpersonation,
   createAgency,
   listAgencies,
-  setAgencyPlan,
+  setAgencySubscription,
   setAgencyStatus,
   startImpersonation,
 } from "./adminService";
@@ -194,7 +194,12 @@ describe("platform admin", () => {
         owner: { name: "Xander", username: "xyz", password: "Secret#2026" },
       }),
     ).rejects.toThrow(/taken/);
-    await setAgencyPlan(actor(), id, "premium");
+    await setAgencySubscription(actor(), id, {
+      plan: "premium",
+      status: "ACTIVE",
+      trialEndsAt: null,
+      paidUntil: null,
+    });
     const row = (await listAgencies(actor())).find((a) => a.id === id)!;
     expect(row).toMatchObject({ plan: "premium", status: "ACTIVE", users: 1 });
 

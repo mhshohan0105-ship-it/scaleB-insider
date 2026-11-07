@@ -34,7 +34,7 @@ export function AccessDenied() {
       <Result
         status="403"
         title="No access"
-        subTitle="Your role does not include this page. Ask the agency owner if you need it."
+        subTitle="Your role or your agency's plan does not include this page. Ask the agency owner if you need it."
       />
     </Card>
   );

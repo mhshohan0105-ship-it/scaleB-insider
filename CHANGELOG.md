@@ -357,3 +357,16 @@ Verified: `npm run check` green (226 unit + 139 integration; one integration run
 - Left as plain pickers on purpose: filters, fixed choices (pax type, class, status, payment method), pickers of existing documents (invoice to refund, ticket to reissue, loan to repay, investment, pilgrims on a transfer or Hajj invoice) and user roles, which need the full permission matrix on Settings > Roles.
 
 Verified: `npm run check` green (226 unit + 139 integration), Playwright 28/28 on port 3137; expense head and loan authority added from their pickers in the browser.
+
+## Step 9, part 1: plans, limits and subscription periods (2026-11-07)
+
+- **Plans** are now rows the platform admin edits (Admin > Plans): name, code, monthly and yearly price, active-user limit (0 = none) and the modules included (Dashboard, Settings and Feedback are always in). Migration `20261107120000_plans` adds the `Plan` table with the three existing plans (Starter 3 users, Standard 10, Premium no limit; every module, no price) and `Agency.trialEndsAt` / `paidUntil`.
+- **Subscription period** per agency (Admin > Agencies > Subscription): plan, Trial with an end day, or Paying with a paid-until day (empty = no end). Days are Dhaka days, ending at midnight. After `paidUntil` there are 7 days of grace; when a trial or the grace runs out the agency becomes **view only**: viewing, printing and exporting work, nothing can be added or changed, and nothing is deleted. Activating a suspended, never-paid trial agency returns it to its trial.
+- **Enforcement** is in one place: `getUserContext` cuts the role's permissions down to the plan (`planPermissions` in `src/lib/subscription.ts`, pure and unit tested), so the sidebar, pages, pickers' "+ Add" and every server action follow it. A refused change after expiry says why. The plan's user limit is checked when a user is added or switched back on.
+- **Agency side:** a strip above every page while a trial runs or a payment is due or overdue, and Settings > Subscription with the plan, period, users used, what is included, the other plans and who to contact to renew. "+ New" in the top bar now lists only forms the user may create in.
+- Existing agencies keep no end date and every module, so nothing changes for them until the admin sets a period.
+- Test fix: the full-database restore test gets 2 minutes; it dumps the whole shared test database, which grows with every run, and was the occasional failure seen earlier.
+
+Verified: `npm run check` green (235 unit + 145 integration), Playwright 28/28 on port 3137; in the browser an agency put on an ended trial shows the strip, loses "+ New" and Add buttons, and a plan cut to two modules hides the rest from the sidebar and blocks their pages.
+
+Next in Step 9: sign-up with a 14 day trial, recording payments, a public landing page with Terms and Privacy, the agency logo on the sign-in page, and alerts.

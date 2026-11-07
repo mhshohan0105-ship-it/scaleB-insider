@@ -11,7 +11,12 @@ import {
   type ModuleKey,
   type PermissionMap,
 } from "@/lib/permissions";
+import { planPermissions } from "@/lib/subscription";
 import type { ServiceContext } from "@/server/services/context";
+import {
+  subscriptionOf,
+  type AgencySubscription,
+} from "@/server/services/subscription/subscriptionService";
 import { ForbiddenError } from "@/server/services/errors";
 
 export interface UserContext {
@@ -27,10 +32,13 @@ export interface UserContext {
   isSuperAdmin: boolean;
   /** Name of the platform admin who opened this session, if any. */
   impersonatedBy: string | null;
+  /** The agency's plan and trial / paid period. */
+  subscription: AgencySubscription;
 }
 
 /**
- * Loads the signed in user with fresh role permissions (once per request).
+ * Loads the signed in user with fresh role permissions (once per request),
+ * cut down to the agency's plan; read only once its trial or paid period ends.
  * Redirects to sign out when the session is missing or the user was deactivated.
  */
 export const getUserContext = cache(async (): Promise<UserContext> => {
@@ -43,6 +51,7 @@ export const getUserContext = cache(async (): Promise<UserContext> => {
     include: { role: true, agency: true },
   });
   if (!user || !user.isActive || user.agency.status === "SUSPENDED") redirect("/signout");
+  const subscription = await subscriptionOf(user.agency);
 
   return {
     userId: user.id,
@@ -52,9 +61,14 @@ export const getUserContext = cache(async (): Promise<UserContext> => {
     roleId: user.roleId,
     roleName: user.role.name,
     agencyName: user.agency.name,
-    permissions: parsePermissions(user.role.permissions),
+    permissions: planPermissions(
+      parsePermissions(user.role.permissions),
+      subscription.plan,
+      subscription.status.state,
+    ),
     isSuperAdmin: user.isSuperAdmin,
     impersonatedBy: session.user.impersonatorName ?? null,
+    subscription,
   };
 });
 
@@ -84,6 +98,12 @@ export async function requirePermission(
   action: Action,
 ): Promise<ServiceContext & { user: UserContext }> {
   const ctx = await getUserContext();
-  if (!can(ctx.permissions, module, action)) throw new ForbiddenError();
+  if (!can(ctx.permissions, module, action)) {
+    if (ctx.subscription.status.state === "expired" && action !== "view" && action !== "export")
+      throw new ForbiddenError(
+        "Your subscription has ended, so records cannot be added or changed. Renew it to continue; viewing and exporting still work.",
+      );
+    throw new ForbiddenError();
+  }
   return { ...(await toServiceContext(ctx)), user: ctx };
 }

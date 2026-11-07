@@ -4,7 +4,7 @@
 // Services write foreign keys as scalar ids (e.g. roleId), never `connect`.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   // native = this computer; the rest = Linux hosts (CloudLinux/RHEL cPanel servers, Docker).
   binaryTargets = ["native", "rhel-openssl-1.1.x", "rhel-openssl-3.0.x", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
 }
@@ -38,7 +38,12 @@ model Agency {
   fiscalYearStart Int          @default(7) // month number, BD fiscal year starts July
   invoiceFooter   String?      @db.Text
   status          AgencyStatus @default(ACTIVE)
+  /// Plan.code of the agency's plan.
   plan            String       @default("standard") @db.Text
+  /// TRIAL: the trial ends here. Null: no end.
+  trialEndsAt     DateTime?
+  /// ACTIVE: paid up to here (a short grace period follows). Null: no end.
+  paidUntil       DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
@@ -2295,4 +2300,23 @@ model AgencyImage {
   agency Agency @relation(fields: [agencyId], references: [id])
 
   @@unique([agencyId, kind])
+}
+
+/// Subscription plan (platform level, not per agency): what an agency may use
+/// and what it costs. Prices are shown to the agency; billing is recorded by
+/// the platform admin.
+model Plan {
+  id           String   @id @default(cuid())
+  code         String   @unique @db.VarChar(40)
+  name         String   @db.VarChar(80)
+  priceMonthly Decimal  @default(0) @db.Decimal(14, 2)
+  priceYearly  Decimal  @default(0) @db.Decimal(14, 2)
+  /// Active users allowed; 0 means no limit.
+  maxUsers     Int      @default(0)
+  /// Module keys the plan includes beyond the core ones; [] means every module.
+  modules      Json     @default("[]")
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

@@ -4,17 +4,13 @@
 // so it uses the base client with explicit filters (documented exception to
 // the tenant-scoped rule), and writes an audit entry in every agency touched.
 import { createHash, randomBytes } from "node:crypto";
-import type { AgencyStatus } from "@prisma/client";
-import { z } from "zod";
+import { Prisma, type AgencyStatus } from "@prisma/client";
+import { todayIso } from "@/lib/dates";
+import { planSchema, subscriptionSchema } from "@/lib/schemas/subscription";
+import { endOfDhakaDay, parsePlanModules, subscriptionStatus } from "@/lib/subscription";
 import { prisma } from "@/server/db/prisma";
 import { provisionAgency, provisionSchema } from "../agency/provisionAgency";
 import { ForbiddenError, NotFoundError, ServiceError, isUniqueViolation } from "../errors";
-
-export const PLANS = [
-  { value: "starter", label: "Starter" },
-  { value: "standard", label: "Standard" },
-  { value: "premium", label: "Premium" },
-] as const;
 
 const IMPERSONATION_TTL_MS = 2 * 60 * 1000;
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -69,6 +65,9 @@ export async function listAgencies(actor: AdminActor) {
     name: a.name,
     status: a.status,
     plan: a.plan,
+    trialEndsOn: a.trialEndsAt ? todayIso(a.trialEndsAt) : null,
+    paidUntilOn: a.paidUntil ? todayIso(a.paidUntil) : null,
+    subscription: subscriptionStatus(a, new Date()),
     phone: a.phone,
     email: a.email,
     users: a._count.users,
@@ -105,19 +104,105 @@ export async function setAgencyStatus(actor: AdminActor, agencyId: string, statu
     throw new ServiceError("You cannot suspend your own agency");
   const before = await prisma.agency.findUnique({ where: { id: agencyId } });
   if (!before) throw new NotFoundError("Agency");
-  await prisma.agency.update({ where: { id: agencyId }, data: { status } });
-  await audit(agencyId, actor, status === "SUSPENDED" ? "DEACTIVATE" : "ACTIVATE", agencyId, {
-    status,
+  // Activating again returns a never-paid trial agency to its trial, not to free use.
+  const next: AgencyStatus =
+    status === "SUSPENDED"
+      ? "SUSPENDED"
+      : before.trialEndsAt && !before.paidUntil
+        ? "TRIAL"
+        : "ACTIVE";
+  await prisma.agency.update({ where: { id: agencyId }, data: { status: next } });
+  await audit(agencyId, actor, next === "SUSPENDED" ? "DEACTIVATE" : "ACTIVATE", agencyId, {
+    status: next,
   });
 }
 
-export async function setAgencyPlan(actor: AdminActor, agencyId: string, plan: string) {
+/**
+ * Sets an agency's plan, trial or paid period. Dates are Dhaka calendar days;
+ * the period runs to the end of that day. A paid date ends any trial.
+ */
+export async function setAgencySubscription(actor: AdminActor, agencyId: string, input: unknown) {
   await assertSuperAdmin(actor.userId);
-  const p = z.enum(PLANS.map((x) => x.value) as [string, ...string[]]).parse(plan);
+  const data = subscriptionSchema.parse(input);
+  if (!(await prisma.plan.findUnique({ where: { code: data.plan } })))
+    throw new ServiceError("Choose a plan", { plan: "Unknown plan" });
   const before = await prisma.agency.findUnique({ where: { id: agencyId } });
   if (!before) throw new NotFoundError("Agency");
-  await prisma.agency.update({ where: { id: agencyId }, data: { plan: p } });
-  await audit(agencyId, actor, "UPDATE", agencyId, { plan: { from: before.plan, to: p } });
+  if (before.status === "SUSPENDED") throw new ServiceError("Activate the agency first");
+  const change = {
+    plan: data.plan,
+    status: data.status,
+    trialEndsAt:
+      data.status === "TRIAL" && data.trialEndsAt ? endOfDhakaDay(data.trialEndsAt) : null,
+    paidUntil: data.paidUntil ? endOfDhakaDay(data.paidUntil) : null,
+  };
+  await prisma.agency.update({ where: { id: agencyId }, data: change });
+  await audit(agencyId, actor, "UPDATE", agencyId, {
+    subscription: {
+      from: {
+        plan: before.plan,
+        status: before.status,
+        trialEndsAt: before.trialEndsAt,
+        paidUntil: before.paidUntil,
+      },
+      to: change,
+    },
+  });
+}
+
+// ─── Plans ──────────────────────────────────────────────────────────────────
+
+export async function listPlans(actor: AdminActor) {
+  await assertSuperAdmin(actor.userId);
+  const [plans, used] = await Promise.all([
+    prisma.plan.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
+    prisma.agency.groupBy({ by: ["plan"], _count: { _all: true } }),
+  ]);
+  return plans.map((p) => ({
+    id: p.id,
+    code: p.code,
+    name: p.name,
+    priceMonthly: p.priceMonthly.toFixed(2),
+    priceYearly: p.priceYearly.toFixed(2),
+    maxUsers: p.maxUsers,
+    modules: parsePlanModules(p.modules) as string[],
+    isActive: p.isActive,
+    sortOrder: p.sortOrder,
+    agencies: used.find((u) => u.plan === p.code)?._count._all ?? 0,
+  }));
+}
+
+export type PlanRow = Awaited<ReturnType<typeof listPlans>>[number];
+
+/** Creates (id = null) or updates a plan. A plan in use keeps its code. */
+export async function savePlan(actor: AdminActor, id: string | null, input: unknown) {
+  await assertSuperAdmin(actor.userId);
+  const data = planSchema.parse(input);
+  const row = {
+    ...data,
+    priceMonthly: new Prisma.Decimal(data.priceMonthly),
+    priceYearly: new Prisma.Decimal(data.priceYearly),
+  };
+  try {
+    if (!id) {
+      const created = await prisma.plan.create({ data: row });
+      await audit(actor.agencyId, actor, "CREATE", created.id, { plan: data });
+      return { id: created.id };
+    }
+    const before = await prisma.plan.findUnique({ where: { id } });
+    if (!before) throw new NotFoundError("Plan");
+    if (before.code !== data.code && (await prisma.agency.count({ where: { plan: before.code } })))
+      throw new ServiceError("Agencies use this plan, so its code cannot change", {
+        code: "In use",
+      });
+    await prisma.plan.update({ where: { id }, data: row });
+    await audit(actor.agencyId, actor, "UPDATE", id, { plan: { from: before, to: data } });
+    return { id };
+  } catch (e) {
+    if (isUniqueViolation(e))
+      throw new ServiceError(`Plan code "${data.code}" is taken`, { code: "Taken" });
+    throw e;
+  }
 }
 
 /**

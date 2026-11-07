@@ -296,6 +296,7 @@ export const NAV: NavModule[] = [
       { label: "All Settings", href: "/settings" },
       { label: "App Config", href: "/settings/app" },
       { label: "Agency Profile", href: "/settings/profile" },
+      { label: "Subscription", href: "/settings/subscription" },
       { label: "Users", href: "/settings/users" },
       { label: "Roles", href: "/settings/roles" },
       { label: "Employees", href: "/settings/employees" },

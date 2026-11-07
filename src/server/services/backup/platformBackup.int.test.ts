@@ -73,7 +73,8 @@ describe("full database backup", () => {
     } finally {
       await target.$disconnect();
     }
-  });
+    // Dumps and restores the whole shared test database, which grows with every run.
+  }, 120_000);
 
   it("writes an encrypted nightly copy and records the run", async () => {
     const run = await runBackup("scheduled", new Date("2026-10-24T20:00:00Z")); // 02:00 Dhaka

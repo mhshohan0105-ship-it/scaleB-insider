@@ -11,6 +11,7 @@ import { recordAudit } from "@/server/audit/audit";
 import { tenantDb, type TenantTx } from "@/server/db/tenant";
 import type { ServiceContext } from "../context";
 import { NotFoundError, ServiceError, isUniqueViolation } from "../errors";
+import { assertUserFits } from "../subscription/subscriptionService";
 
 const BCRYPT_ROUNDS = 10;
 
@@ -102,6 +103,7 @@ export async function createUser(ctx: ServiceContext, input: unknown): Promise<{
   try {
     return await tenantDb(ctx.agencyId).$transaction(async (tx) => {
       await assertRoleAndEmployee(tx, data.roleId, data.employeeId);
+      await assertUserFits(tx, ctx.agencyId);
       const user = await tx.user.create({
         data: {
           agencyId: ctx.agencyId,
@@ -156,6 +158,7 @@ export async function setUserActive(
     const before = await tx.user.findFirst({ where: { id }, select: safeSelect });
     if (!before) throw new NotFoundError("User");
     if (before.isActive === active) return;
+    if (active) await assertUserFits(tx, ctx.agencyId);
     const after = await tx.user.update({
       where: { id },
       data: { isActive: active },

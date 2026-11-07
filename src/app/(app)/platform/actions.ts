@@ -9,8 +9,9 @@ import { runAction } from "@/server/actions/runAction";
 import { getUserContext, requirePermission } from "@/server/auth/session";
 import {
   createAgency,
-  setAgencyPlan,
+  savePlan,
   setAgencyStatus,
+  setAgencySubscription,
   startImpersonation,
   type AdminActor,
 } from "@/server/services/admin/adminService";
@@ -60,8 +61,12 @@ export async function setAgencyStatusAction(id: string, status: AgencyStatus) {
   );
 }
 
-export async function setAgencyPlanAction(id: string, plan: string) {
-  return runAction(async () => setAgencyPlan(await actor(), id, plan));
+export async function setAgencySubscriptionAction(id: string, values: unknown) {
+  return runAction(async () => setAgencySubscription(await actor(), id, values));
+}
+
+export async function savePlanAction(id: string | null, values: unknown) {
+  return runAction(async () => savePlan(await actor(), id, values));
 }
 
 /** Replaces this session with one signed in as the agency's owner. */

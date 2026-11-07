@@ -27,6 +27,7 @@ import {
   UserOutlined,
 } from "@ant-design/icons";
 import { navEntries, type NavModule } from "@/lib/nav";
+import type { ModuleKey } from "@/lib/permissions";
 import { THEME } from "@/components/Providers";
 import { FALLBACK_ICON, NAV_ICONS } from "./navIcons";
 import { LiveClock } from "./LiveClock";
@@ -46,12 +47,14 @@ export interface ShellUser {
 
 interface AppShellProps {
   nav: NavModule[];
+  /** Modules the user may create records in (fills "+ New"). */
+  creatable: ModuleKey[];
   user: ShellUser;
   logoutAction: () => Promise<void>;
   children: ReactNode;
 }
 
-export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
+export function AppShell({ nav, creatable, user, logoutAction, children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
@@ -96,11 +99,11 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
 
   const entries = useMemo(() => navEntries(nav), [nav]);
 
-  // "+ New": every create page the user's role can open, grouped by module.
+  // "+ New": every create page the user may use, grouped by module.
   const createMenu: MenuProps["items"] = useMemo(() => {
     const groups = new Map<string, { key: string; label: ReactNode }[]>();
     for (const e of entries) {
-      if (!e.leaf.href.endsWith("/new")) continue;
+      if (!e.leaf.href.endsWith("/new") || !creatable.includes(e.module.module)) continue;
       const label = e.leaf.label.replace(/^New\s+/, "").replace(/: Create$/, "");
       const list = groups.get(e.module.label) ?? [];
       list.push({ key: e.leaf.href, label: <Link href={e.leaf.href}>{label}</Link> });
@@ -111,7 +114,7 @@ export function AppShell({ nav, user, logoutAction, children }: AppShellProps) {
         ? { key: children[0]!.key, label: <Link href={children[0]!.key}>{group}</Link> }
         : { key: group, label: group, children },
     );
-  }, [entries]);
+  }, [entries, creatable]);
 
   const menuItems: MenuProps["items"] = useMemo(
     () =>

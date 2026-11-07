@@ -12,6 +12,8 @@ import {
   updateAirInvoice,
 } from "@/server/services/invoices/airInvoiceService";
 import { voidInvoice } from "@/server/services/invoices/invoiceCommon";
+import { previewInvoice } from "@/server/services/invoices/invoicePreview";
+import { renderInvoicePdf } from "@/server/pdf/invoicePdfFile";
 import { clientSnapshot } from "@/server/services/parties/quickClient";
 import {
   createItemInvoice,
@@ -47,6 +49,20 @@ export async function createInvoiceAction(type: string, values: unknown) {
     if (t === "REISSUE") return createReissueInvoice(ctx, values);
     if (isItemInvoiceType(t)) return createItemInvoice(ctx, t, values);
     throw new ServiceError("This invoice type is not available yet");
+  });
+}
+
+/**
+ * The invoice as its PDF, before saving: built exactly as "Save & post" would,
+ * then rolled back. Returned as base64 for the preview window.
+ */
+export async function previewInvoiceAction(type: string, values: unknown) {
+  return runAction(async () => {
+    const t = typeOf(type);
+    const ctx = await requirePermission(INVOICE_TYPE_INFO[t].module, "create");
+    const doc = await previewInvoice(ctx, t, values);
+    const pdf = await renderInvoicePdf(ctx, doc, null);
+    return { number: doc.number, pdf: Buffer.from(pdf).toString("base64") };
   });
 }
 

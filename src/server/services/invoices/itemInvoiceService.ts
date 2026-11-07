@@ -6,8 +6,7 @@ import { calcItemLine } from "@/lib/calc/items";
 import { dateToIso, isoToDate } from "@/lib/dates";
 import { isActive } from "@/lib/hajj";
 import { itemInvoiceSchema } from "@/lib/schemas/invoices";
-import type { TenantTx } from "@/server/db/tenant";
-import { tenantDb } from "@/server/db/tenant";
+import { tenantDb, type TenantDb, type TenantTx } from "@/server/db/tenant";
 import type { ServiceContext } from "../context";
 import { NotFoundError, ServiceError } from "../errors";
 import { createInvoice, updateInvoice, type PreparedLines } from "./invoiceSave";
@@ -157,9 +156,10 @@ export async function createItemInvoice(
   ctx: ServiceContext,
   type: ItemInvoiceType,
   input: unknown,
+  inTx?: TenantTx,
 ): Promise<{ id: string; number: string }> {
   const data = itemInvoiceSchema.parse(input);
-  return createInvoice(ctx, type, data, prepareItems(ctx, type, data.items));
+  return createInvoice(ctx, type, data, prepareItems(ctx, type, data.items), inTx);
 }
 
 export async function updateItemInvoice(
@@ -179,8 +179,13 @@ export async function postDraftItemInvoice(ctx: ServiceContext, type: ItemInvoic
   await updateItemInvoice(ctx, type, id, { ...itemFormValues(inv), post: true });
 }
 
-export async function getItemInvoice(ctx: ServiceContext, type: InvoiceType, id: string) {
-  const inv = await tenantDb(ctx.agencyId).invoice.findFirst({
+export async function getItemInvoice(
+  ctx: ServiceContext,
+  type: InvoiceType,
+  id: string,
+  db: TenantDb | TenantTx = tenantDb(ctx.agencyId),
+) {
+  const inv = await db.invoice.findFirst({
     where: { id, type },
     include: {
       client: {

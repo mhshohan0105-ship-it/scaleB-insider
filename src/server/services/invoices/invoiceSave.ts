@@ -147,13 +147,18 @@ function header(h: InvoiceHeaderInput & { clientId: string }, lines: PreparedLin
   };
 }
 
+/**
+ * Creates an invoice in its own transaction, or in `inTx` when given (the
+ * invoice preview runs it there and rolls everything back).
+ */
 export async function createInvoice(
   ctx: ServiceContext,
   type: InvoiceType,
   h: InvoiceHeaderInput,
   prepare: PrepareLines,
+  inTx?: TenantTx,
 ): Promise<{ id: string; number: string }> {
-  return tenantDb(ctx.agencyId).$transaction(async (tx) => {
+  const run = async (tx: TenantTx) => {
     const withClient = { ...h, clientId: await resolveClient(tx, ctx, h) };
     await assertHeaderRefs(tx, withClient);
     const lines = await prepare(tx, null);
@@ -202,7 +207,8 @@ export async function createInvoice(
       );
     }
     return { id: invoice.id, number };
-  });
+  };
+  return inTx ? run(inTx) : tenantDb(ctx.agencyId).$transaction(run);
 }
 
 /**
@@ -227,8 +233,7 @@ export async function updateInvoice(
     if (await tx.refund.count({ where: { invoiceId: id, status: "POSTED" } })) {
       throw new ServiceError("This invoice has refunds. Void the refunds before editing it.");
     }
-    if (h.payment)
-      throw new ServiceError("Take payments for a saved invoice from Money receipts");
+    if (h.payment) throw new ServiceError("Take payments for a saved invoice from Money receipts");
     const withClient = { ...h, clientId: await resolveClient(tx, ctx, h) };
     if (before.clientId !== withClient.clientId && before.paidAmount.greaterThan(0)) {
       throw new ServiceError("The client cannot change once money has been received", {

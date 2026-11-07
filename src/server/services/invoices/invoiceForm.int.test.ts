@@ -6,6 +6,7 @@ import { prisma } from "@/server/db/prisma";
 import { tenantDb } from "@/server/db/tenant";
 import { createMoneyAccount } from "@/server/services/accounts/moneyAccountService";
 import { createAirInvoice, getAirInvoice } from "@/server/services/invoices/airInvoiceService";
+import { previewInvoice } from "@/server/services/invoices/invoicePreview";
 import { saveMaster } from "@/server/services/masters/masterService";
 import { findClientByPhone, quickCreateClient } from "@/server/services/parties/quickClient";
 import { makeAgency } from "@/tests/integration/helpers";
@@ -213,5 +214,48 @@ describe("invoice with money received", () => {
     expect(
       await prisma.client.count({ where: { agencyId: A.agency.id, phone: "01611000555" } }),
     ).toBe(0);
+  });
+});
+
+describe("preview before saving", () => {
+  it("shows the invoice as it will print, saves nothing and uses no number", async () => {
+    const db = tenantDb(A.agency.id);
+    const before = {
+      invoices: await db.invoice.count(),
+      clients: await db.client.count(),
+      receipts: await db.moneyReceipt.count(),
+      entries: await db.journalEntry.count(),
+    };
+    const input = {
+      newClient: { name: "Preview Person", phone: "01511000666" },
+      date: "2026-10-26",
+      showPrevDue: true,
+      tickets: [ticket("1761000000777", { extraFee: "300" })],
+      payment: { moneyAccountId: cashId, paymentMethod: "CASH", amount: "10000" },
+    };
+
+    const doc = await previewInvoice(A.ctx, "AIR", input);
+    expect(doc.status).toBe("PREVIEW");
+    expect(doc.client.name).toBe("Preview Person");
+    expect([doc.netTotal, doc.paidAmount, doc.due]).toEqual(["48500.00", "10000.00", "38500.00"]);
+    expect(doc.previousDue).toBe("0.00");
+    expect(doc.rows[0]!.cells[1]!.main).toBe("1761000000777");
+
+    expect({
+      invoices: await db.invoice.count(),
+      clients: await db.client.count(),
+      receipts: await db.moneyReceipt.count(),
+      entries: await db.journalEntry.count(),
+    }).toEqual(before);
+
+    // Saving for real gets the number the preview showed.
+    const saved = await createAirInvoice(A.ctx, { ...input, post: true });
+    expect(saved.number).toBe(doc.number);
+  });
+
+  it("reports the same problems saving would", async () => {
+    await expect(
+      previewInvoice(A.ctx, "AIR", { date: "2026-10-26", tickets: [ticket("1761000000778")] }),
+    ).rejects.toThrow(/Choose a client/);
   });
 });

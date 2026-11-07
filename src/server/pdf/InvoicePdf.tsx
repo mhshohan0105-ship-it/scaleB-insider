@@ -72,6 +72,7 @@ const STAMPS: Record<string, { text: string; color: string } | undefined> = {
   POSTED: { text: "DUE", color: "#b42318" },
   VOID: { text: "VOID", color: "#4a5a56" },
   DRAFT: { text: "DRAFT", color: "#4a5a56" },
+  PREVIEW: { text: "PREVIEW", color: "#0f6b5c" },
   REFUNDED: { text: "REFUNDED", color: "#4a5a56" },
 };
 
@@ -101,7 +102,10 @@ export function InvoicePdf({
   const stampStatus =
     invoice.status === "POSTED" && invoice.due === "0.00" ? "PAID" : invoice.status;
   const stamp =
-    invoice.status === "VOID" || invoice.status === "DRAFT" || options.showStamp
+    invoice.status === "VOID" ||
+    invoice.status === "DRAFT" ||
+    invoice.status === "PREVIEW" ||
+    options.showStamp
       ? STAMPS[stampStatus]
       : undefined;
   const cols = invoice.columns;

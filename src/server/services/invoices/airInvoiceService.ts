@@ -11,7 +11,7 @@ import {
   nonCommissionInvoiceSchema,
   type FlightSegment,
 } from "@/lib/schemas/invoices";
-import { tenantDb, type TenantTx } from "@/server/db/tenant";
+import { tenantDb, type TenantDb, type TenantTx } from "@/server/db/tenant";
 import type { ServiceContext } from "../context";
 import { NotFoundError, ServiceError } from "../errors";
 import { createInvoice, updateInvoice, type PreparedLines } from "./invoiceSave";
@@ -189,9 +189,10 @@ export async function createAirInvoice(
   ctx: ServiceContext,
   input: unknown,
   type: TicketInvoiceType = "AIR",
+  inTx?: TenantTx,
 ): Promise<{ id: string; number: string }> {
   const data = parse(type, input);
-  return createInvoice(ctx, type, data, prepareTickets(ctx, type, data.tickets));
+  return createInvoice(ctx, type, data, prepareTickets(ctx, type, data.tickets), inTx);
 }
 
 export async function updateAirInvoice(
@@ -222,8 +223,9 @@ export async function getAirInvoice(
   ctx: ServiceContext,
   id: string,
   type: TicketInvoiceType = "AIR",
+  db: TenantDb | TenantTx = tenantDb(ctx.agencyId),
 ) {
-  const inv = await tenantDb(ctx.agencyId).invoice.findFirst({
+  const inv = await db.invoice.findFirst({
     where: { id, type },
     include: {
       client: {

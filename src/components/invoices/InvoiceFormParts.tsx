@@ -3,9 +3,10 @@
 // Building blocks shared by every invoice form (approved layout): the sticky
 // summary with discount / service charge / VAT and the printed-invoice
 // choices, "Receive payment now", and the sticky action bar.
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
+  App,
   Button,
   Card,
   Col,
@@ -13,6 +14,7 @@ import {
   Flex,
   Form,
   Input,
+  Modal,
   Row,
   Select,
   Switch,
@@ -20,7 +22,10 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { DownloadOutlined } from "@ant-design/icons";
+import { DownloadOutlined, EyeOutlined } from "@ant-design/icons";
+import type { FormInstance } from "antd";
+import { applyActionResult } from "@/components/formResult";
+import { previewInvoiceAction } from "@/app/(app)/invoices/invoiceActions";
 import type { Dayjs } from "dayjs";
 import type { InvoiceTotals } from "@/lib/calc/invoiceTotals";
 import { d } from "@/lib/calc/money";
@@ -341,6 +346,7 @@ export function InvoiceActionBar({
   pending,
   primaryLabel,
   onSubmit,
+  onPreview,
 }: {
   summary: ReactNode;
   cancelHref: string;
@@ -348,6 +354,8 @@ export function InvoiceActionBar({
   pending: boolean;
   primaryLabel: string;
   onSubmit: (post: boolean, output?: PdfOutput) => void;
+  /** Shows the invoice as it will print, before saving (new invoices). */
+  onPreview?: () => void;
 }) {
   return (
     <div className="inv-actions">
@@ -361,6 +369,11 @@ export function InvoiceActionBar({
       {showDraft && (
         <Button loading={pending} onClick={() => onSubmit(false)}>
           Save as draft
+        </Button>
+      )}
+      {onPreview && (
+        <Button icon={<EyeOutlined />} loading={pending} onClick={onPreview}>
+          Preview
         </Button>
       )}
       <Button type="primary" ghost loading={pending} onClick={() => onSubmit(true, "print")}>
@@ -409,6 +422,86 @@ export function openPrintWindow(output?: PdfOutput) {
     },
     cancel: () => w?.close(),
   };
+}
+
+/**
+ * "Preview": the invoice built as "Save & post" would build it, shown as its
+ * PDF without saving anything. `show` takes the same payload as saving.
+ */
+export function useInvoicePreview(type: string) {
+  const { message } = App.useApp();
+  const [doc, setDoc] = useState<{ url: string; number: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function show(payload: unknown, form: FormInstance) {
+    setLoading(true);
+    const r = await previewInvoiceAction(type, payload);
+    setLoading(false);
+    if (!applyActionResult(r, form, message)) return;
+    const bytes = Uint8Array.from(atob(r.data.pdf), (c) => c.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+    setDoc({ url, number: r.data.number });
+  }
+
+  function close() {
+    if (doc) URL.revokeObjectURL(doc.url);
+    setDoc(null);
+  }
+
+  return { doc, loading, show, close };
+}
+
+/** The preview window: the PDF, with Save & post right there. */
+export function InvoicePreviewModal({
+  preview,
+  onSave,
+}: {
+  preview: ReturnType<typeof useInvoicePreview>;
+  onSave: () => void;
+}) {
+  const { doc } = preview;
+  return (
+    <Modal
+      open={doc !== null}
+      title={doc ? `Preview · ${doc.number}` : "Preview"}
+      width={920}
+      onCancel={preview.close}
+      styles={{ body: { padding: 0 } }}
+      footer={[
+        <Button key="close" onClick={preview.close}>
+          Back to editing
+        </Button>,
+        doc && (
+          <Button
+            key="dl"
+            icon={<DownloadOutlined />}
+            href={doc.url}
+            download={`${doc.number}-preview.pdf`}
+          >
+            Download preview
+          </Button>
+        ),
+        <Button
+          key="save"
+          type="primary"
+          onClick={() => {
+            preview.close();
+            onSave();
+          }}
+        >
+          Looks right, Save & post
+        </Button>,
+      ]}
+    >
+      {doc && (
+        <iframe
+          title="Invoice preview"
+          src={doc.url}
+          style={{ width: "100%", height: "72vh", border: 0, display: "block" }}
+        />
+      )}
+    </Modal>
+  );
 }
 
 export { money as formatMaybeMoney };

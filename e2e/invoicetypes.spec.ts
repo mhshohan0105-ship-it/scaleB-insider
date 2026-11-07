@@ -75,3 +75,26 @@ test("visa invoice moves through the Visa Process board", async ({ page }) => {
   await expect(card.getByText(/^delivered /)).toBeVisible();
   await expect(card.getByRole("link", { name: invoiceNo })).toBeVisible();
 });
+
+test("preview shows the invoice before it is saved", async ({ page }) => {
+  const stamp = Date.now().toString();
+  await signIn(page, "admin");
+  await open(page, "/invoices/other/new");
+  await choose(page, "Client", "Nasima Akter", "Nasima");
+  await page.getByLabel("Qty").fill("1");
+  await page.getByLabel("Description").fill(`Preview E2E ${stamp}`);
+  await page.getByLabel("Unit price").fill("2500");
+  await page.getByLabel("Unit cost").fill("2000");
+  await choose(page, "Vendor", "Makkah Hotels Group", "Makkah");
+
+  await page.getByRole("button", { name: "Preview" }).click();
+  const dialog = page.getByRole("dialog", { name: /Preview · OTH-\d{4}-\d{5}/ });
+  await expect(dialog).toBeVisible({ timeout: 60_000 });
+  await expect(dialog.locator("iframe[title='Invoice preview']")).toBeVisible();
+  // Nothing is saved by the preview.
+  await expect(page).toHaveURL(/\/invoices\/other\/new$/);
+
+  await dialog.getByRole("button", { name: "Looks right, Save & post" }).click();
+  await expect(page).toHaveURL(/\/invoices\/other\/(?!new$)[a-z0-9]+$/, { timeout: 30_000 });
+  await expect(page.getByText(`Preview E2E ${stamp}`)).toBeVisible();
+});

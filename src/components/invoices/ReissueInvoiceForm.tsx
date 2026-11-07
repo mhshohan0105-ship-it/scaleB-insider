@@ -39,7 +39,9 @@ import {
   InvoiceSummaryAside,
   ReceivePaymentCard,
   methodForAccount,
+  InvoicePreviewModal,
   openPrintWindow,
+  useInvoicePreview,
   type PdfOutput,
   paymentPayload,
   type AccountOption,
@@ -189,23 +191,37 @@ export function ReissueInvoiceForm({
     form.setFieldValue("lines", lines);
   }
 
+  /** What saving (and the preview) sends to the server. */
+  function payloadOf(v: FormValues, post: boolean) {
+    return {
+      ...v,
+      date: iso(v.date),
+      dueDate: iso(v.dueDate),
+      lines: (v.lines ?? []).map((l) => ({
+        ...l,
+        journeyDate: iso(l.journeyDate),
+        returnDate: iso(l.returnDate),
+      })),
+      payment: paymentPayload(v.payment, canReceive && receive && post, iso),
+      post,
+    };
+  }
+
+  const preview = useInvoicePreview("REISSUE");
+
+  function openPreview() {
+    form
+      .validateFields()
+      .then((v) => preview.show(payloadOf(v, true), form))
+      .catch(() => message.error("Please fix the highlighted fields"));
+  }
+
   function submit(post: boolean, output?: PdfOutput) {
     const printed = openPrintWindow(output);
     form
       .validateFields()
       .then((v) => {
-        const payload = {
-          ...v,
-          date: iso(v.date),
-          dueDate: iso(v.dueDate),
-          lines: (v.lines ?? []).map((l) => ({
-            ...l,
-            journeyDate: iso(l.journeyDate),
-            returnDate: iso(l.returnDate),
-          })),
-          payment: paymentPayload(v.payment, canReceive && receive && post, iso),
-          post,
-        };
+        const payload = payloadOf(v, post);
         startTransition(async () => {
           const result =
             mode === "create"
@@ -436,10 +452,12 @@ export function ReissueInvoiceForm({
           summary={`${(values?.lines ?? []).length} reissue${(values?.lines ?? []).length === 1 ? "" : "s"}`}
           cancelHref={invoiceId ? `/invoices/reissue/${invoiceId}` : "/invoices/reissue"}
           showDraft={mode === "create" || isDraft === true}
-          pending={pending}
+          pending={pending || preview.loading}
           primaryLabel={mode === "edit" && !isDraft ? "Save changes" : "Save & post"}
           onSubmit={submit}
+          onPreview={mode === "create" ? openPreview : undefined}
         />
+        <InvoicePreviewModal preview={preview} onSave={() => submit(true)} />
       </Form>
     </>
   );

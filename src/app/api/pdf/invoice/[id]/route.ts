@@ -1,65 +1,13 @@
 import { NextResponse } from "next/server";
-import { renderToBuffer } from "@react-pdf/renderer";
-import { createElement } from "react";
-import { INVOICE_TYPE_INFO, type InvoiceTypeKey } from "@/lib/invoiceTypes";
+import { INVOICE_TYPE_INFO } from "@/lib/invoiceTypes";
 import { can } from "@/lib/permissions";
 import { getUserContext, toServiceContext } from "@/server/auth/session";
-import { invoiceBranding } from "@/server/pdf/branding";
-import { InvoicePdf } from "@/server/pdf/InvoicePdf";
-import {
-  itemDocument,
-  reissueDocument,
-  ticketDocument,
-  visaDocument,
-  type PdfInvoice,
-} from "@/server/pdf/invoiceDocument";
-import { tenantDb } from "@/server/db/tenant";
-import type { ServiceContext } from "@/server/services/context";
-import { getAirInvoice } from "@/server/services/invoices/airInvoiceService";
+import { loadInvoiceDocument } from "@/server/pdf/invoiceLoad";
+import { renderInvoicePdf } from "@/server/pdf/invoicePdfFile";
 import { invoiceTypeOf } from "@/server/services/invoices/invoiceCommon";
-import { getItemInvoice } from "@/server/services/invoices/itemInvoiceService";
-import { getReissueInvoice } from "@/server/services/invoices/reissueInvoiceService";
-import { getVisaInvoice } from "@/server/services/invoices/visaInvoiceService";
-import { getAppConfig, getProfile } from "@/server/services/settings/settingsService";
 
 // PDFs, exports and nightly jobs can take longer than the platform default.
 export const maxDuration = 60;
-
-async function loadDocument(
-  ctx: ServiceContext,
-  type: InvoiceTypeKey,
-  id: string,
-): Promise<PdfInvoice | null> {
-  if (type === "AIR" || type === "NON_COMMISSION") {
-    const inv = await getAirInvoice(ctx, id, type);
-    return inv && ticketDocument(inv);
-  }
-  if (type === "REISSUE") {
-    const inv = await getReissueInvoice(ctx, id);
-    return inv && reissueDocument(inv);
-  }
-  if (type === "VISA") {
-    const inv = await getVisaInvoice(ctx, id);
-    return inv && visaDocument(inv);
-  }
-  if (INVOICE_TYPE_INFO[type].lines === "item") {
-    const inv = await getItemInvoice(ctx, type, id);
-    return inv && itemDocument(inv);
-  }
-  return null;
-}
-
-/** What the client owed before this invoice (cached balance less this invoice's due). */
-async function previousDue(ctx: ServiceContext, invoiceId: string, due: string) {
-  const db = tenantDb(ctx.agencyId);
-  const inv = await db.invoice.findFirst({ where: { id: invoiceId }, select: { clientId: true } });
-  const client = inv
-    ? await db.client.findFirst({ where: { id: inv.clientId }, select: { balance: true } })
-    : null;
-  if (!client) return null;
-  const before = client.balance.minus(due);
-  return before.greaterThan(0) ? before.toFixed(2) : "0.00";
-}
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -71,24 +19,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!can(user.permissions, INVOICE_TYPE_INFO[type].module, "view")) {
     return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   }
-  const [invoice, agency, config] = await Promise.all([
-    loadDocument(ctx, type, id),
-    getProfile(ctx),
-    getAppConfig(ctx),
-  ]);
+  const invoice = await loadInvoiceDocument(ctx, type, id);
   if (!invoice) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const branding = await invoiceBranding(ctx, agency, id, invoice.status);
-  if (invoice.showPrevDue) invoice.previousDue = await previousDue(ctx, id, invoice.due);
 
-  const pdf = await renderToBuffer(
-    createElement(InvoicePdf, {
-      invoice,
-      agency,
-      branding,
-      terms: config.invoiceTerms,
-      footer: config.invoiceFooter,
-    }) as never,
-  );
+  const pdf = await renderInvoicePdf(ctx, invoice, id);
   return new NextResponse(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",

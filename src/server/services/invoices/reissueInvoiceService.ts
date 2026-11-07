@@ -5,7 +5,7 @@ import { Prisma } from "@prisma/client";
 import { calcReissueLine } from "@/lib/calc/reissue";
 import { dateToIso, isoToDate } from "@/lib/dates";
 import { reissueInvoiceSchema } from "@/lib/schemas/invoices";
-import { tenantDb, type TenantTx } from "@/server/db/tenant";
+import { tenantDb, type TenantDb, type TenantTx } from "@/server/db/tenant";
 import type { ServiceContext } from "../context";
 import { NotFoundError, ServiceError } from "../errors";
 import { createInvoice, updateInvoice, type PreparedLines } from "./invoiceSave";
@@ -97,9 +97,10 @@ function prepareReissue(ctx: ServiceContext, clientId: string, lines: ParsedLine
 export async function createReissueInvoice(
   ctx: ServiceContext,
   input: unknown,
+  inTx?: TenantTx,
 ): Promise<{ id: string; number: string }> {
   const data = reissueInvoiceSchema.parse(input);
-  return createInvoice(ctx, "REISSUE", data, prepareReissue(ctx, data.clientId, data.lines));
+  return createInvoice(ctx, "REISSUE", data, prepareReissue(ctx, data.clientId, data.lines), inTx);
 }
 
 export async function updateReissueInvoice(
@@ -118,8 +119,12 @@ export async function postDraftReissueInvoice(ctx: ServiceContext, id: string) {
   await updateReissueInvoice(ctx, id, { ...reissueFormValues(inv), post: true });
 }
 
-export async function getReissueInvoice(ctx: ServiceContext, id: string) {
-  const inv = await tenantDb(ctx.agencyId).invoice.findFirst({
+export async function getReissueInvoice(
+  ctx: ServiceContext,
+  id: string,
+  db: TenantDb | TenantTx = tenantDb(ctx.agencyId),
+) {
+  const inv = await db.invoice.findFirst({
     where: { id, type: "REISSUE" },
     include: {
       client: {

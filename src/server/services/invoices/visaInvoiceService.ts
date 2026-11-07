@@ -6,7 +6,7 @@ import { d } from "@/lib/calc/money";
 import { dateToIso, isoToDate, todayIso } from "@/lib/dates";
 import { visaInvoiceSchema, visaStatusSchema } from "@/lib/schemas/invoices";
 import { recordAudit } from "@/server/audit/audit";
-import { tenantDb, type TenantTx } from "@/server/db/tenant";
+import { tenantDb, type TenantDb, type TenantTx } from "@/server/db/tenant";
 import type { ServiceContext } from "../context";
 import { NotFoundError, ServiceError } from "../errors";
 import { createInvoice, updateInvoice, type PreparedLines } from "./invoiceSave";
@@ -113,9 +113,9 @@ function prepareVisa(ctx: ServiceContext, lines: ParsedLine[]) {
   };
 }
 
-export async function createVisaInvoice(ctx: ServiceContext, input: unknown) {
+export async function createVisaInvoice(ctx: ServiceContext, input: unknown, inTx?: TenantTx) {
   const data = visaInvoiceSchema.parse(input);
-  return createInvoice(ctx, "VISA", data, prepareVisa(ctx, data.lines));
+  return createInvoice(ctx, "VISA", data, prepareVisa(ctx, data.lines), inTx);
 }
 
 export async function updateVisaInvoice(ctx: ServiceContext, id: string, input: unknown) {
@@ -188,8 +188,12 @@ export async function setVisaStatus(
     });
 }
 
-export async function getVisaInvoice(ctx: ServiceContext, id: string) {
-  const inv = await tenantDb(ctx.agencyId).invoice.findFirst({
+export async function getVisaInvoice(
+  ctx: ServiceContext,
+  id: string,
+  db: TenantDb | TenantTx = tenantDb(ctx.agencyId),
+) {
+  const inv = await db.invoice.findFirst({
     where: { id, type: "VISA" },
     include: {
       client: {

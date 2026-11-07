@@ -14,14 +14,15 @@ function pdfImage(img: { mimeType: string; data: Uint8Array } | null): PdfImage 
 export async function invoiceBranding(
   ctx: ServiceContext,
   agency: AgencyProfile,
-  invoiceId: string,
+  /** Null for a preview: nothing is saved yet, so there is no QR link. */
+  invoiceId: string | null,
   status: string,
 ): Promise<InvoiceBranding> {
-  const wantQr = agency.pdf.showQr && status !== "DRAFT";
+  const wantQr = agency.pdf.showQr && status !== "DRAFT" && invoiceId !== null;
   const [logo, seal, qr] = await Promise.all([
     agency.images.LOGO ? getAgencyImage(ctx, "LOGO") : null,
     agency.images.SEAL ? getAgencyImage(ctx, "SEAL") : null,
-    wantQr ? ensurePublicToken(ctx, invoiceId).then((t) => qrPng(verifyUrl(t))) : null,
+    wantQr && invoiceId ? ensurePublicToken(ctx, invoiceId).then((t) => qrPng(verifyUrl(t))) : null,
   ]);
   return { logo: pdfImage(logo), seal: pdfImage(seal), qr, options: agency.pdf };
 }

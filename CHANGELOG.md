@@ -403,3 +403,10 @@ Verified: `npm run check` green (240 unit + 151 integration); the sign-up e2e pa
 - Every invoice form (air ticket, non commission, visa, reissue, other, packages, tour, Hajj, Umrah) has **Save & download PDF** next to Post and print: the invoice is posted and its PDF is saved as `<invoice number>.pdf`. The invoice page has a **Download PDF** button beside Print / PDF. `/api/pdf/invoice/[id]?download=1` serves the file as an attachment.
 
 Verified: `npm run check` green; the other services e2e test now saves with Save & download PDF and checks both downloads are named after the invoice.
+
+## Invoice preview before saving (2026-11-08)
+
+- New invoices of every type have a **Preview** button. It shows the invoice as its PDF in a window, exactly as "Save & post" would make it (next number, prices, money received, previous due, logo and stamp "PREVIEW"), without saving anything: the invoice is created inside a transaction, read back and rolled back, so no invoice, client, receipt or journal entry stays and no number is used up. The window has "Back to editing", "Download preview" and "Looks right, Save & post". Problems are shown on the form as when saving.
+- `createInvoice` (and the four create services) can run inside a caller's transaction; the getters read with a given client. Loading and rendering the printable invoice moved to `src/server/pdf/invoiceLoad.ts` and `invoicePdfFile.ts`, shared by the PDF route and the preview (`previewInvoiceAction`).
+
+Verified: `npm run check` green (241 unit + 153 integration, with preview tests that nothing is saved and the real save gets the previewed number); Playwright preview test passes; checked in the browser on an Other invoice.
